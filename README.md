@@ -1,62 +1,75 @@
-# Nunito
-📚 Aplicación Educativa - Minijuegos PIE
+# Nunito 
+📚 Aplicación Educativa - Minijuegos PIE  
 
-Aplicación móvil multiplataforma diseñada para niños de 6 a 9 años del Programa de Integración Escolar (PIE). Su objetivo es reforzar la conciencia fonológica mediante minijuegos interactivos, con supervisión docente en tiempo real.
+![Build](https://img.shields.io/badge/build-in_progress-yellow)  
+![License](https://img.shields.io/badge/license-MIT-blue)  
+![Made with](https://img.shields.io/badge/made%20with-React%20Native-61DAFB?logo=react)  
+![Database](https://img.shields.io/badge/database-SQL-lightgrey?logo=sqlite)  
 
-🎯 Objetivo
+Aplicación móvil multiplataforma destinada a niños de **6 a 9 años** del **Programa de Integración Escolar (PIE)**.  
+Su objetivo es **reforzar la conciencia fonológica** mediante minijuegos interactivos, con supervisión docente en tiempo real.  
 
-Fortalecer habilidades fonológicas en estudiantes PIE a través de actividades breves, dinámicas y lúdicas, que permiten al profesor crear salas virtuales, guiar a los alumnos y monitorear su progreso.
+---
 
-🕹️ Funcionalidades principales
+## 📚 Tabla de Contenidos  
+- [🎯 Objetivo](#-objetivo)  
+- [🕹️ Funcionalidades](#️-funcionalidades)  
+- [🎮 Minijuegos](#-minijuegos)  
+- [🛠️ Tecnologías](#️-tecnologías)  
+- [🚀 Instalación](#-instalación)  
+- [📸 Capturas](#-capturas)  
+- [👥 Autores](#-autores)  
+- [📄 Licencia](#-licencia)  
 
-👩‍🏫 Profesor
+---
 
-- Crear salas virtuales con un código único.
-- Configurar actividad, tiempo y nivel de dificultad.
-- Supervisar participación en tiempo real.
-- Recibir informes grupales e individuales (aciertos, errores, tiempo).
+## 🎯 Objetivo  
+Fortalecer habilidades fonológicas en estudiantes PIE a través de actividades breves, dinámicas y lúdicas,  
+permitiendo a los profesores **crear salas virtuales**, guiar a los alumnos y **monitorear su progreso**.  
 
-👦 Alumno
+---
 
-- Unirse a salas con nombre y código.
-- Participar en minijuegos interactivos.
-- Obtener retroalimentación inmediata en cada intento.
-- Visualizar un resumen personal de desempeño.
+## 🕹️ Funcionalidades  
 
-🎮 Minijuegos incluidos
+### 👩‍🏫 Profesor  
+- Crear salas virtuales con un **código único**.  
+- Configurar actividad, tiempo y nivel de dificultad.  
+- Supervisar participación en tiempo real.  
+- Recibir informes grupales e individuales (aciertos, errores, tiempo).  
 
-- Asociación Imagen-Palabra
-- Conteo de Sílabas
-- Identificación de Rimas
-- Reconocimiento Auditivo
+### 👦 Alumno  
+- Unirse a salas con nombre y código.  
+- Participar en minijuegos interactivos.  
+- Recibir retroalimentación inmediata.  
+- Visualizar un resumen personal de desempeño.  
 
-🛠️ Tecnologías
+---
 
-Framework: Multiplataforma (iOS / Android).
-Backend: Base de datos para resultados e informes.
-Sistema de cuentas: Simples, solo para docentes.
+## 🎮 Minijuegos  
+- 🖼️ **Asociación Imagen-Palabra**  
+- 🔡 **Conteo de Sílabas**  
+- 🎵 **Identificación de Rimas**  
+- 🔊 **Reconocimiento Auditivo**  
 
-📊 Requerimientos funcionales clave
+---
 
-- RF-01: Crear sala virtual con código único.
-- RF-02: Configurar actividad, tiempo y nivel.
-- RF-03: Unirse a sala con nombre y código.
-- RF-04 a RF-07: Minijuegos de fonología.
-- RF-08: Retroalimentación inmediata.
-- RF-09: Resumen personal del alumno.
-- RF-10: Informe grupal del profesor.
-- RF-11: Almacenamiento de resultados en base de datos.
+## 🛠️ Tecnologías  
+- **Frontend**: React Native / Expo  
+- **Backend**: Node.js o Spring Boot (según implementación)  
+- **Base de datos**: SQLite / MySQL  
+- **Autenticación básica**: Cuentas simples para docentes  
 
-🚧 Estado del proyecto
+---
 
-🔹 Fase actual: Planificación inicial.
-🔹 Próximos hitos: Desarrollo del prototipo funcional y validación con stakeholders.
+## 🚀 Instalación  
 
-👥 Stakeholders
+```bash
+# Clonar repositorio
+git clone https://github.com/usuario/minijuegos-pie.git
+cd minijuegos-pie
 
-- Principal: Docente de Educación Diferencial.
-- Adicional: Departamento de Psicología.
+# Instalar dependencias
+pnpm install
 
-📖 Documentación
-
-Documento de Inicio y Alcance
+# Iniciar aplicación
+pnpm run start
