@@ -71,5 +71,8 @@ cd minijuegos-pie
 # Instalar dependencias
 pnpm install
 
+# Crear build
+pnpm run build
+
 # Iniciar aplicación
 pnpm run start
