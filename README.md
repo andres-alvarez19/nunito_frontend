@@ -4,7 +4,7 @@
 ![Build](https://img.shields.io/badge/build-in_progress-yellow)  
 ![License](https://img.shields.io/badge/license-MIT-blue)  
 ![Made with](https://img.shields.io/badge/made%20with-React%20Native-61DAFB?logo=react)  
-![Database](https://img.shields.io/badge/database-SQL-lightgrey?logo=sqlite)  
+![Database](https://img.shields.io/badge/database-postgresql-4169e1?logo=postgresql&logoColor=white)  
 
 Aplicación móvil multiplataforma destinada a niños de **6 a 9 años** del **Programa de Integración Escolar (PIE)**.  
 Su objetivo es **reforzar la conciencia fonológica** mediante minijuegos interactivos, con supervisión docente en tiempo real.  
