@@ -1,8 +1,19 @@
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useMemo, useState } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import { palette } from '@/theme/colors';
-import type { Room, Teacher } from '@/features/home/types';
+import {
+  gameDefinitions,
+  gameThemeTokens,
+} from "@/features/home/constants/games";
+import { palette, withAlpha } from "@/theme/colors";
+import type { Room, Teacher } from "@/features/home/types";
 
 interface RoomCreationProps {
   teacher: Teacher;
@@ -10,31 +21,50 @@ interface RoomCreationProps {
   onBack: () => void;
 }
 
-const gameOptions = [
-  { id: 'image-word', label: 'Asociación Imagen-Palabra' },
-  { id: 'syllable-count', label: 'Conteo de Sílabas' },
-  { id: 'rhyme-identification', label: 'Identificación de Rimas' },
-  { id: 'audio-recognition', label: 'Reconocimiento Auditivo' },
-];
+type GameOption = {
+  id: string;
+  label: string;
+  color: (typeof gameDefinitions)[number]["color"];
+};
+
+const gameOptions: GameOption[] = gameDefinitions.map((game) => ({
+  id: game.id,
+  label: game.name,
+  color: game.color,
+}));
 
 const difficultyOptions = [
-  { id: 'easy', label: 'Fácil' },
-  { id: 'medium', label: 'Intermedio' },
-  { id: 'hard', label: 'Difícil' },
+  { id: "easy", label: "Fácil" },
+  { id: "medium", label: "Intermedio" },
+  { id: "hard", label: "Difícil" },
 ];
 
 const durationOptions = [5, 10, 15, 20, 30];
 
-export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCreationProps) {
-  const [roomName, setRoomName] = useState('');
-  const [selectedGame, setSelectedGame] = useState('');
-  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard' | ''>('');
+export default function RoomCreation({
+  teacher,
+  onRoomCreated,
+  onBack,
+}: RoomCreationProps) {
+  const [roomName, setRoomName] = useState("");
+  const [selectedGame, setSelectedGame] = useState("");
+  const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard" | "">(
+    "",
+  );
   const [duration, setDuration] = useState(10);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isValid = useMemo(() => {
     return Boolean(roomName && selectedGame && difficulty);
   }, [roomName, selectedGame, difficulty]);
+
+  const selectedGameDefinition = useMemo(
+    () => gameDefinitions.find((game) => game.id === selectedGame),
+    [selectedGame],
+  );
+  const selectedGameTheme = selectedGameDefinition
+    ? gameThemeTokens[selectedGameDefinition.color]
+    : null;
 
   const handleSubmit = () => {
     if (!isValid || !difficulty) return;
@@ -59,10 +89,15 @@ export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCre
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Crear nueva sala</Text>
-        <Text style={styles.subtitle}>Hola {teacher.name}, completa la información para tu sesión.</Text>
+        <Text style={styles.subtitle}>
+          Hola {teacher.name}, completa la información para tu sesión.
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -74,28 +109,66 @@ export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCre
             value={roomName}
             onChangeText={setRoomName}
             placeholder="Ej: Clase 3°A - Fonología"
-            placeholderTextColor={palette.muted}
+            placeholderTextColor={withAlpha(palette.muted, 0.6)}
           />
         </View>
 
         <View style={styles.field}>
           <Text style={styles.label}>Selecciona un juego</Text>
           <View style={styles.optionList}>
-            {gameOptions.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={[styles.optionButton, selectedGame === option.id && styles.optionButtonActive]}
-                onPress={() => setSelectedGame(option.id)}
-              >
-                <Text
-                  style={[styles.optionText, selectedGame === option.id && styles.optionTextActive]}
+            {gameOptions.map((option) => {
+              const theme = gameThemeTokens[option.color];
+              const isActive = selectedGame === option.id;
+
+              return (
+                <TouchableOpacity
+                  key={option.id}
+                  style={[
+                    styles.optionButton,
+                    isActive && {
+                      borderColor: theme.accent,
+                      backgroundColor: withAlpha(theme.accent, 0.16),
+                    },
+                  ]}
+                  onPress={() => setSelectedGame(option.id)}
                 >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.optionText,
+                      isActive && { color: theme.accent },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
+
+        {selectedGameDefinition && selectedGameTheme && (
+          <View
+            style={[
+              styles.selectedGameCard,
+              {
+                backgroundColor: withAlpha(selectedGameTheme.accent, 0.12),
+                borderColor: withAlpha(selectedGameTheme.accent, 0.4),
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.selectedGameTitle,
+                { color: selectedGameTheme.accent },
+              ]}
+            >
+              Juego seleccionado: {selectedGameDefinition.name}
+            </Text>
+            <Text style={styles.selectedGameDescription}>
+              {selectedGameDefinition.description}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.field}>
           <Text style={styles.label}>Nivel de dificultad</Text>
@@ -103,10 +176,18 @@ export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCre
             {difficultyOptions.map((option) => (
               <TouchableOpacity
                 key={option.id}
-                style={[styles.chip, difficulty === option.id && styles.chipActive]}
+                style={[
+                  styles.chip,
+                  difficulty === option.id && styles.chipActive,
+                ]}
                 onPress={() => setDifficulty(option.id as typeof difficulty)}
               >
-                <Text style={[styles.chipText, difficulty === option.id && styles.chipTextActive]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    difficulty === option.id && styles.chipTextActive,
+                  ]}
+                >
                   {option.label}
                 </Text>
               </TouchableOpacity>
@@ -123,7 +204,14 @@ export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCre
                 style={[styles.chip, duration === value && styles.chipActive]}
                 onPress={() => setDuration(value)}
               >
-                <Text style={[styles.chipText, duration === value && styles.chipTextActive]}>{value}</Text>
+                <Text
+                  style={[
+                    styles.chipText,
+                    duration === value && styles.chipTextActive,
+                  ]}
+                >
+                  {value}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -131,14 +219,23 @@ export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCre
 
         <TouchableOpacity
           accessibilityRole="button"
-          style={[styles.primaryButton, (!isValid || isSubmitting) && styles.disabledButton]}
+          style={[
+            styles.primaryButton,
+            (!isValid || isSubmitting) && styles.disabledButton,
+          ]}
           disabled={!isValid || isSubmitting}
           onPress={handleSubmit}
         >
-          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Creando sala...' : 'Crear sala'}</Text>
+          <Text style={styles.primaryButtonText}>
+            {isSubmitting ? "Creando sala..." : "Crear sala"}
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity accessibilityRole="button" onPress={onBack} style={styles.secondaryButton}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          onPress={onBack}
+          style={styles.secondaryButton}
+        >
           <Text style={styles.secondaryButtonText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
@@ -149,15 +246,16 @@ export default function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCre
 const styles = StyleSheet.create({
   container: {
     padding: 24,
+    paddingBottom: 40,
+    gap: 24,
     backgroundColor: palette.background,
   },
   header: {
-    marginBottom: 24,
     gap: 8,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 30,
+    fontWeight: "700",
     color: palette.text,
   },
   subtitle: {
@@ -166,18 +264,20 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: palette.surface,
-    borderRadius: 18,
-    padding: 20,
+    borderRadius: 22,
+    padding: 24,
     gap: 20,
-    shadowColor: '#00000022',
+    borderWidth: 1,
+    borderColor: palette.border,
+    shadowColor: "#0000001f",
     shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowRadius: 12,
-    elevation: 2,
+    elevation: 3,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: "700",
     color: palette.text,
   },
   field: {
@@ -185,16 +285,16 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: "600",
     color: palette.text,
   },
   input: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 12,
+    borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: withAlpha(palette.primary, 0.02),
     fontSize: 16,
     color: palette.text,
   },
@@ -204,25 +304,18 @@ const styles = StyleSheet.create({
   optionButton: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 14,
-    paddingVertical: 12,
+    borderRadius: 16,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     backgroundColor: palette.surface,
   },
-  optionButtonActive: {
-    borderColor: palette.primary,
-    backgroundColor: '#EEF2FF',
-  },
   optionText: {
     color: palette.text,
-    fontWeight: '600',
-  },
-  optionTextActive: {
-    color: palette.primary,
+    fontWeight: "600",
   },
   optionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
   },
   chip: {
@@ -231,39 +324,63 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 16,
     paddingVertical: 8,
+    backgroundColor: palette.surface,
   },
   chipActive: {
     borderColor: palette.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: withAlpha(palette.primary, 0.14),
   },
   chipText: {
     color: palette.text,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   chipTextActive: {
     color: palette.primary,
   },
+  selectedGameCard: {
+    borderRadius: 18,
+    padding: 16,
+    gap: 6,
+    borderWidth: 1,
+  },
+  selectedGameTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  selectedGameDescription: {
+    fontSize: 14,
+    color: palette.muted,
+  },
   primaryButton: {
     backgroundColor: palette.primary,
     paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
+    borderRadius: 14,
+    alignItems: "center",
+    shadowColor: "#00000022",
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
   },
   disabledButton: {
     opacity: 0.6,
   },
   primaryButtonText: {
     color: palette.primaryOn,
-    fontWeight: 'bold',
+    fontWeight: "700",
     fontSize: 16,
   },
   secondaryButton: {
     paddingVertical: 12,
-    alignItems: 'center',
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: palette.primary,
+    backgroundColor: withAlpha(palette.primary, 0.05),
   },
   secondaryButtonText: {
     color: palette.primary,
-    fontWeight: '600',
+    fontWeight: "600",
     fontSize: 15,
   },
 });
