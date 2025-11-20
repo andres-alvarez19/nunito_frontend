@@ -6,32 +6,28 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Copy, Users, Clock, Play, Square, BarChart3 } from "lucide-react"
 
-interface Teacher {
-  name: string
-  email: string
-}
-
 interface Room {
-  id: string
-  code: string
-  name: string
-  game: string
-  difficulty: string
-  duration: number
-  teacher: Teacher
-  students: string[]
-  isActive: boolean
+  id: string;
+  code: string;
+  name: string;
+  game: string;
+  difficulty: string;
+  duration: number;
+  teacherId: string;
+  students: string[];
+  isActive: boolean;
 }
 
 interface RoomDashboardProps {
-  room: Room
-  onStartGame: () => void
-  onEndGame: () => void
-  onViewResults: () => void
-  onBack: () => void
+  room: Room;
+  teacherName: string;
+  onStartGame: () => void;
+  onEndGame: () => void;
+  onViewResults: () => void;
+  onBack: () => void;
 }
 
-export function RoomDashboard({ room, onStartGame, onEndGame, onViewResults, onBack }: RoomDashboardProps) {
+export function RoomDashboard({ room, teacherName, onStartGame, onEndGame, onViewResults, onBack }: RoomDashboardProps) {
   const [currentRoom, setCurrentRoom] = useState(room)
   const [timeRemaining, setTimeRemaining] = useState(room.duration * 60)
   const [copied, setCopied] = useState(false)
@@ -103,7 +99,7 @@ export function RoomDashboard({ room, onStartGame, onEndGame, onViewResults, onB
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">{currentRoom.name}</h1>
-            <p className="text-muted-foreground">Sala creada por {currentRoom.teacher.name}</p>
+            <p className="text-muted-foreground">Sala creada por {teacherName}</p>
           </div>
           <Badge variant={currentRoom.isActive ? "default" : "secondary"} className="text-lg px-4 py-2">
             {currentRoom.isActive ? "Activa" : "En espera"}

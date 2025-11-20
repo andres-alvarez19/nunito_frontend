@@ -30,18 +30,19 @@ interface RoomReport {
 }
 
 interface TeacherReportsProps {
-  teacherName: string
-  onBack: () => void
+  teacherId: string;
+  teacherName: string;
+  onBack: () => void;
 }
 
-export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
+export function TeacherReports({ teacherId, teacherName, onBack }: TeacherReportsProps) {
   const [reports, setReports] = useState<RoomReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<RoomReport | null>(null)
 
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/rooms/all/results');
+        const response = await fetch(`http://localhost:3001/api/rooms/all/results?teacherId=${teacherId}`);
         const data = await response.json();
         
         // Process the data to group results by room
@@ -89,7 +90,7 @@ export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
     };
 
     fetchReports();
-  }, []);
+  }, [teacherId]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES", {

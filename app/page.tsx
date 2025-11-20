@@ -19,20 +19,21 @@ import { StudentResults } from "@/components/student-results"
 import { TeacherReports } from "@/components/teacher-reports"
 
 interface Teacher {
-  name: string
-  email: string
+  teacherId: string;
+  name: string;
+  email: string;
 }
 
 interface Room {
-  id: string
-  code: string
-  name:string
-  game: string
-  difficulty: string
-  duration: number
-  teacher: Teacher
-  students: string[]
-  isActive: boolean
+  id: string;
+  code: string;
+  name: string;
+  game: string;
+  difficulty: string;
+  duration: number;
+  teacherId: string;
+  students: string[];
+  isActive: boolean;
 }
 
 interface GameResults {
@@ -202,7 +203,7 @@ export default function HomePage() {
   }
 
   if (appState === "teacher-reports" && currentTeacher) {
-    return <TeacherReports teacherName={currentTeacher.name} onBack={() => setAppState("teacher-menu")} />
+    return <TeacherReports teacherId={currentTeacher.teacherId} teacherName={currentTeacher.name} onBack={() => setAppState("teacher-menu")} />
   }
 
   if (appState === "room-creation" && currentTeacher) {
@@ -215,10 +216,11 @@ export default function HomePage() {
     )
   }
 
-  if (appState === "room-dashboard" && currentRoom) {
+  if (appState === "room-dashboard" && currentRoom && currentTeacher) {
     return (
       <RoomDashboard
         room={currentRoom}
+        teacherName={currentTeacher.name}
         onStartGame={handleGameStart}
         onEndGame={handleGameEnd}
         onViewResults={handleViewResults}

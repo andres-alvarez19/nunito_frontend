@@ -3,6 +3,7 @@ const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
 
+const crypto = require('crypto');
 const app = express();
 const port = 3001;
 
@@ -26,7 +27,12 @@ function generateRoomCode() {
 
 app.post('/api/rooms', (req, res) => {
   console.log('Creating a new room with data:', req.body);
-  const { name, game, difficulty, duration, teacher } = req.body;
+  const { name, game, difficulty, duration, teacherId } = req.body;
+  const teacher = teachers.find(t => t.teacherId === teacherId);
+  if (!teacher) {
+    return res.status(400).json({ message: 'Teacher not found' });
+  }
+
   const newRoom = {
     id: new Date().toISOString(),
     code: generateRoomCode(),
@@ -34,7 +40,7 @@ app.post('/api/rooms', (req, res) => {
     game,
     difficulty,
     duration,
-    teacher,
+    teacherId,
     students: [],
     isActive: true,
   };
@@ -75,10 +81,22 @@ app.get('/api/rooms/:roomCode/results', (req, res) => {
 
 app.get('/api/rooms/all/results', (req, res) => {
   console.log('Getting all results');
+  const { teacherId } = req.query;
+  if (teacherId) {
+    const teacherRooms = rooms.filter(r => r.teacherId === teacherId).map(r => r.code);
+    const results = gameResults.filter(r => teacherRooms.includes(r.roomCode));
+    console.log(`Found ${results.length} results for teacher ${teacherId}`);
+    return res.json(results);
+  }
   res.json(gameResults);
 });
 
-
+app.get('/api/teachers/:teacherId/rooms', (req, res) => {
+  const { teacherId } = req.params;
+  const teacherRooms = rooms.filter(r => r.teacherId === teacherId);
+  console.log(`Found ${teacherRooms.length} rooms for teacher ${teacherId}`);
+  res.json(teacherRooms);
+});
 
 app.post('/api/teachers/register', (req, res) => {
   console.log('Registering a new teacher with data:', req.body);
@@ -87,7 +105,7 @@ app.post('/api/teachers/register', (req, res) => {
     console.log(`Teacher already exists: ${email}`);
     return res.status(400).json({ message: 'Teacher already exists' });
   }
-  const newTeacher = { name, email, password };
+  const newTeacher = { teacherId: crypto.randomUUID(), name, email, password };
   teachers.push(newTeacher);
   console.log('New teacher registered:', newTeacher);
   res.status(201).json(newTeacher);

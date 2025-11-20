@@ -12,26 +12,27 @@ import { Badge } from "@/components/ui/badge"
 import { Settings, Play } from "lucide-react"
 
 interface Teacher {
-  name: string
-  email: string
+  teacherId: string;
+  name: string;
+  email: string;
 }
 
 interface RoomCreationProps {
-  teacher: Teacher
-  onRoomCreated: (room: Room) => void
-  onBack: () => void
+  teacher: Teacher;
+  onRoomCreated: (room: Room) => void;
+  onBack: () => void;
 }
 
 interface Room {
-  id: string
-  code: string
-  name: string
-  game: string
-  difficulty: string
-  duration: number
-  teacher: Teacher
-  students: string[]
-  isActive: boolean
+  id: string;
+  code: string;
+  name: string;
+  game: string;
+  difficulty: string;
+  duration: number;
+  teacherId: string;
+  students: string[];
+  isActive: boolean;
 }
 
 const games = [
@@ -50,10 +51,6 @@ export function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCreationPro
   })
   const [isCreating, setIsCreating] = useState(false)
 
-  const generateRoomCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase()
-  }
-
   const handleCreateRoom = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsCreating(true)
@@ -64,7 +61,7 @@ export function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCreationPro
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ...roomData, teacher }),
+        body: JSON.stringify({ ...roomData, teacherId: teacher.teacherId }),
       });
 
       if (response.ok) {
