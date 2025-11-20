@@ -35,6 +35,19 @@ interface TeacherReportsProps {
   onBack: () => void;
 }
 
+const gameNames = {
+  "image-word": "Asociación Imagen-Palabra",
+  "syllable-count": "Conteo de Sílabas",
+  "rhyme-identification": "Identificación de Rimas",
+  "audio-recognition": "Reconocimiento Auditivo",
+};
+
+const difficultyLabels = {
+  easy: "Fácil",
+  medium: "Intermedio",
+  hard: "Difícil",
+};
+
 export function TeacherReports({ teacherId, teacherName, onBack }: TeacherReportsProps) {
   const [reports, setReports] = useState<RoomReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<RoomReport | null>(null)
