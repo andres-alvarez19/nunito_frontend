@@ -10,9 +10,15 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { LogIn, UserPlus, Eye, EyeOff } from "lucide-react"
 
+interface Teacher {
+  teacherId: string;
+  name: string;
+  email: string;
+}
+
 interface TeacherLoginProps {
-  onLogin: (teacher: { name: string; email: string }) => void
-  onBack: () => void
+  onLogin: (teacher: Teacher) => void;
+  onBack: () => void;
 }
 
 export function TeacherLogin({ onLogin, onBack }: TeacherLoginProps) {

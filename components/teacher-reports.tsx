@@ -58,11 +58,11 @@ export function TeacherReports({ teacherId, teacherName, onBack }: TeacherReport
         const roomsResponse = await fetch(`http://localhost:3001/api/teachers/${teacherId}/rooms`);
         const rooms = await roomsResponse.json();
 
-        const reportsPromises = rooms.map(async (room) => {
+        const reportsPromises = rooms.map(async (room: any) => {
           const resultsResponse = await fetch(`http://localhost:3001/api/rooms/${room.code}/results`);
           const results = await resultsResponse.json();
 
-          const students = results.map(result => ({
+          const students = results.map((result: any) => ({
             name: result.studentName,
             gameId: room.game,
             score: result.results.score,
@@ -72,7 +72,7 @@ export function TeacherReports({ teacherId, teacherName, onBack }: TeacherReport
             completedAt: result.timestamp,
           }));
 
-          const totalScore = students.reduce((sum, s) => sum + s.score, 0);
+          const totalScore = students.reduce((sum: any, s: any) => sum + s.score, 0);
           const averageScore = students.length > 0 ? totalScore / students.length : 0;
           
           return {
