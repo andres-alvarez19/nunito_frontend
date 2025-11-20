@@ -36,24 +36,20 @@ export function RoomDashboard({ room, onStartGame, onEndGame, onViewResults, onB
   const [timeRemaining, setTimeRemaining] = useState(room.duration * 60)
   const [copied, setCopied] = useState(false)
 
-  // Simulate students joining
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7 && currentRoom.students.length < 8) {
-        const studentNames = ["Ana", "Carlos", "María", "Diego", "Sofía", "Mateo", "Isabella", "Sebastián"]
-        const availableNames = studentNames.filter((name) => !currentRoom.students.includes(name))
-        if (availableNames.length > 0) {
-          const newStudent = availableNames[Math.floor(Math.random() * availableNames.length)]
-          setCurrentRoom((prev) => ({
-            ...prev,
-            students: [...prev.students, newStudent],
-          }))
-        }
-      }
-    }, 3000)
+    const ws = new WebSocket(`ws://localhost:3001?roomCode=${room.code}`);
 
-    return () => clearInterval(interval)
-  }, [currentRoom.students])
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === 'student-joined') {
+        setCurrentRoom(message.payload.room);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [room.code]);
 
   // Timer countdown
   useEffect(() => {

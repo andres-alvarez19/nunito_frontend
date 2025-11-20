@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Users, Play, Trophy, ImageIcon, Volume2, Mic, Hash } from "lucide-react"
+import { Toaster } from "@/components/ui/toaster"
+import { useToast } from "@/components/ui/use-toast"
 import { TeacherLogin } from "@/components/teacher-login"
 import { RoomCreation } from "@/components/room-creation"
 import { RoomDashboard } from "@/components/room-dashboard"
@@ -24,7 +26,7 @@ interface Teacher {
 interface Room {
   id: string
   code: string
-  name: string
+  name:string
   game: string
   difficulty: string
   duration: number
@@ -62,6 +64,8 @@ export default function HomePage() {
   const [currentGameId, setCurrentGameId] = useState<string>("")
   const [gameResults, setGameResults] = useState<GameResults | null>(null)
   const [demoMode, setDemoMode] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleTeacherLogin = (teacher: Teacher) => {
     setCurrentTeacher(teacher)
@@ -73,9 +77,38 @@ export default function HomePage() {
     setAppState("room-dashboard")
   }
 
-  const handleStudentJoin = () => {
+  const handleStudentJoin = async () => {
     if (studentName.trim() && roomCode.trim()) {
-      setAppState("student-dashboard")
+      setIsLoading(true)
+      try {
+        const response = await fetch(`http://localhost:3001/api/rooms/${roomCode}/join`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ studentName: studentName.trim() }),
+        })
+
+        if (response.ok) {
+          const room = await response.json()
+          setCurrentRoom(room)
+          setAppState("student-dashboard")
+        } else {
+          toast({
+            title: "Error",
+            description: "No se encontró la sala. Revisa el código e inténtalo de nuevo.",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        toast({
+          title: "Error de Red",
+          description: "No se pudo conectar al servidor. Por favor, inténtalo más tarde.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -84,10 +117,27 @@ export default function HomePage() {
     setAppState("student-game")
   }
 
-  const handleGameComplete = (results: GameResults) => {
-    setGameResults(results)
-    setAppState("student-results")
-  }
+  const handleGameComplete = async (results: GameResults) => {
+    setGameResults(results);
+    if (currentRoom) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/rooms/${currentRoom.code}/results`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ studentName, results }),
+        });
+        if (!response.ok) {
+          console.error("Failed to submit results");
+        }
+      } catch (error) {
+        console.error("Error submitting results:", error);
+      }
+    }
+    setAppState("student-results");
+  };
+
 
   const handleGameStart = () => {
     console.log("Game started!")

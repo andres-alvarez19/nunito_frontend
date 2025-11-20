@@ -58,23 +58,27 @@ export function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCreationPro
     e.preventDefault()
     setIsCreating(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      const newRoom: Room = {
-        id: Date.now().toString(),
-        code: generateRoomCode(),
-        name: roomData.name,
-        game: roomData.game,
-        difficulty: roomData.difficulty,
-        duration: roomData.duration,
-        teacher,
-        students: [],
-        isActive: false,
-      }
+    try {
+      const response = await fetch("http://localhost:3001/api/rooms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ...roomData, teacher }),
+      });
 
-      onRoomCreated(newRoom)
-      setIsCreating(false)
-    }, 1000)
+      if (response.ok) {
+        const newRoom = await response.json();
+        onRoomCreated(newRoom);
+      } else {
+        const error = await response.json();
+        alert(error.message);
+      }
+    } catch (error) {
+      alert("An error occurred during room creation.");
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   const selectedGame = games.find((g) => g.id === roomData.game)

@@ -34,103 +34,62 @@ interface TeacherReportsProps {
   onBack: () => void
 }
 
-// Mock data for demonstration
-const mockReports: RoomReport[] = [
-  {
-    roomId: "1",
-    roomName: "Clase 3°A - Fonología",
-    gameId: "image-word",
-    difficulty: "easy",
-    studentsCount: 8,
-    averageScore: 85,
-    completionRate: 100,
-    createdAt: "2024-01-15T10:30:00Z",
-    students: [
-      {
-        name: "Ana García",
-        gameId: "image-word",
-        score: 95,
-        correctAnswers: 19,
-        totalQuestions: 20,
-        averageTime: 8.5,
-        completedAt: "2024-01-15T10:45:00Z",
-      },
-      {
-        name: "Carlos López",
-        gameId: "image-word",
-        score: 80,
-        correctAnswers: 16,
-        totalQuestions: 20,
-        averageTime: 12.3,
-        completedAt: "2024-01-15T10:47:00Z",
-      },
-      {
-        name: "María Rodríguez",
-        gameId: "image-word",
-        score: 90,
-        correctAnswers: 18,
-        totalQuestions: 20,
-        averageTime: 9.8,
-        completedAt: "2024-01-15T10:46:00Z",
-      },
-      {
-        name: "Diego Martínez",
-        gameId: "image-word",
-        score: 75,
-        correctAnswers: 15,
-        totalQuestions: 20,
-        averageTime: 15.2,
-        completedAt: "2024-01-15T10:48:00Z",
-      },
-    ],
-  },
-  {
-    roomId: "2",
-    roomName: "Clase 2°B - Sílabas",
-    gameId: "syllable-count",
-    difficulty: "medium",
-    studentsCount: 6,
-    averageScore: 78,
-    completionRate: 83,
-    createdAt: "2024-01-14T14:15:00Z",
-    students: [
-      {
-        name: "Sofía Hernández",
-        gameId: "syllable-count",
-        score: 85,
-        correctAnswers: 17,
-        totalQuestions: 20,
-        averageTime: 11.2,
-        completedAt: "2024-01-14T14:30:00Z",
-      },
-      {
-        name: "Mateo Silva",
-        gameId: "syllable-count",
-        score: 70,
-        correctAnswers: 14,
-        totalQuestions: 20,
-        averageTime: 18.5,
-        completedAt: "2024-01-14T14:32:00Z",
-      },
-    ],
-  },
-]
-
-const gameNames = {
-  "image-word": "Asociación Imagen-Palabra",
-  "syllable-count": "Conteo de Sílabas",
-  "rhyme-identification": "Identificación de Rimas",
-  "audio-recognition": "Reconocimiento Auditivo",
-}
-
-const difficultyLabels = {
-  easy: "Fácil",
-  medium: "Intermedio",
-  hard: "Difícil",
-}
-
 export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
+  const [reports, setReports] = useState<RoomReport[]>([]);
   const [selectedReport, setSelectedReport] = useState<RoomReport | null>(null)
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/rooms/all/results');
+        const data = await response.json();
+        
+        // Process the data to group results by room
+        const reportsByRoom = data.reduce((acc, result) => {
+          const { roomCode, studentName, results, timestamp } = result;
+          if (!acc[roomCode]) {
+            acc[roomCode] = {
+              roomId: roomCode,
+              roomName: `Sala ${roomCode}`, // You might want to fetch room details for a better name
+              gameId: 'image-word', // This should come from room details
+              difficulty: 'easy', // This should come from room details
+              studentsCount: 0,
+              averageScore: 0,
+              completionRate: 0,
+              createdAt: timestamp,
+              students: [],
+            };
+          }
+          
+          acc[roomCode].students.push({
+            name: studentName,
+            gameId: 'image-word',
+            score: results.score,
+            correctAnswers: results.correctAnswers,
+            totalQuestions: results.totalQuestions,
+            averageTime: results.averageTime,
+            completedAt: timestamp,
+          });
+          
+          return acc;
+        }, {} as { [key: string]: RoomReport });
+
+        // Calculate aggregate values
+        Object.values(reportsByRoom).forEach(report => {
+          report.studentsCount = report.students.length;
+          const totalScore = report.students.reduce((sum, s) => sum + s.score, 0);
+          report.averageScore = report.students.length > 0 ? totalScore / report.students.length : 0;
+          report.completionRate = report.students.length > 0 ? 100 : 0; // This is a simplified calculation
+        });
+
+        setReports(Object.values(reportsByRoom));
+      } catch (error) {
+        console.error("Failed to fetch reports:", error);
+      }
+    };
+
+    fetchReports();
+  }, []);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("es-ES", {
@@ -323,7 +282,7 @@ export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
         <div className="space-y-4">
           <h2 className="text-2xl font-bold">Salas Recientes</h2>
 
-          {mockReports.length === 0 ? (
+          {reports.length === 0 ? (
             <Card>
               <CardContent className="pt-8">
                 <div className="text-center py-8">
@@ -337,7 +296,7 @@ export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {mockReports.map((report) => (
+              {reports.map((report) => (
                 <Card key={report.roomId} className="cursor-pointer hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -355,7 +314,7 @@ export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
                         </div>
                         <div>
                           <p className={`text-2xl font-bold ${getScoreColor(report.averageScore)}`}>
-                            {report.averageScore}%
+                            {report.averageScore.toFixed(0)}%
                           </p>
                           <p className="text-sm text-muted-foreground">Promedio</p>
                         </div>
@@ -368,7 +327,7 @@ export function TeacherReports({ teacherName, onBack }: TeacherReportsProps) {
                       <div>
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-sm font-medium">Progreso General</span>
-                          <span className="text-sm text-muted-foreground">{report.averageScore}%</span>
+                          <span className="text-sm text-muted-foreground">{report.averageScore.toFixed(0)}%</span>
                         </div>
                         <Progress value={report.averageScore} />
                       </div>

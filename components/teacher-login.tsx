@@ -31,14 +31,27 @@ export function TeacherLogin({ onLogin, onBack }: TeacherLoginProps) {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      onLogin({
-        name: "Profesor Demo",
-        email: loginData.email,
-      })
-      setIsLoading(false)
-    }, 1000)
+    try {
+      const response = await fetch("http://localhost:3001/api/teachers/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(loginData),
+      });
+
+      if (response.ok) {
+        const teacher = await response.json();
+        onLogin(teacher);
+      } else {
+        const error = await response.json();
+        alert(error.message);
+      }
+    } catch (error) {
+      alert("An error occurred during login.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -50,14 +63,31 @@ export function TeacherLogin({ onLogin, onBack }: TeacherLoginProps) {
 
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      onLogin({
-        name: registerData.name,
-        email: registerData.email,
-      })
-      setIsLoading(false)
-    }, 1000)
+    try {
+      const response = await fetch("http://localhost:3001/api/teachers/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: registerData.name,
+          email: registerData.email,
+          password: registerData.password,
+        }),
+      });
+
+      if (response.ok) {
+        const teacher = await response.json();
+        onLogin(teacher);
+      } else {
+        const error = await response.json();
+        alert(error.message);
+      }
+    } catch (error) {
+      alert("An error occurred during registration.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
