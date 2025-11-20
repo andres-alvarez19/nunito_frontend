@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { TeacherLogin } from "@/components/teacher-login"
 import { RoomCreation } from "@/components/room-creation"
 import { RoomDashboard } from "@/components/room-dashboard"
+import { TeacherDashboard } from "@/components/teacher-dashboard"
 import { StudentDashboard } from "@/components/student-dashboard"
 import { NavigationMenu } from "@/components/navigation-menu"
 import { GameLauncher } from "@/components/game-launcher"
@@ -47,6 +48,7 @@ interface GameResults {
 type AppState =
   | "home"
   | "teacher-login"
+  | "teacher-dashboard"
   | "room-creation"
   | "room-dashboard"
   | "student-dashboard"
@@ -70,13 +72,18 @@ export default function HomePage() {
 
   const handleTeacherLogin = (teacher: Teacher) => {
     setCurrentTeacher(teacher)
-    setAppState("teacher-menu")
+    setAppState("teacher-dashboard")
   }
 
   const handleRoomCreated = (room: Room) => {
     setCurrentRoom(room)
     setAppState("room-dashboard")
   }
+
+  const handleGoToRoom = (room: Room) => {
+    setCurrentRoom(room);
+    setAppState("room-dashboard");
+  };
 
   const handleStudentJoin = async () => {
     if (studentName.trim() && roomCode.trim()) {
@@ -191,19 +198,21 @@ export default function HomePage() {
     return <TeacherLogin onLogin={handleTeacherLogin} onBack={resetToHome} />
   }
 
-  if (appState === "teacher-menu" && currentTeacher) {
+  if (appState === "teacher-dashboard" && currentTeacher) {
     return (
-      <NavigationMenu
-        userType="teacher"
-        userName={currentTeacher.name}
-        onNavigate={handleTeacherNavigate}
+      <TeacherDashboard
+        teacherId={currentTeacher.teacherId}
+        teacherName={currentTeacher.name}
+        onGoToRoom={handleGoToRoom}
+        onCreateRoom={() => setAppState("room-creation")}
+        onViewReports={() => setAppState("teacher-reports")}
         onLogout={resetToHome}
       />
-    )
+    );
   }
 
   if (appState === "teacher-reports" && currentTeacher) {
-    return <TeacherReports teacherId={currentTeacher.teacherId} teacherName={currentTeacher.name} onBack={() => setAppState("teacher-menu")} />
+    return <TeacherReports teacherId={currentTeacher.teacherId} teacherName={currentTeacher.name} onBack={() => setAppState("teacher-dashboard")} />
   }
 
   if (appState === "room-creation" && currentTeacher) {
@@ -211,7 +220,7 @@ export default function HomePage() {
       <RoomCreation
         teacher={currentTeacher}
         onRoomCreated={handleRoomCreated}
-        onBack={() => setAppState("teacher-menu")}
+        onBack={() => setAppState("teacher-dashboard")}
       />
     )
   }
@@ -224,7 +233,7 @@ export default function HomePage() {
         onStartGame={handleGameStart}
         onEndGame={handleGameEnd}
         onViewResults={handleViewResults}
-        onBack={() => setAppState("teacher-menu")}
+        onBack={() => setAppState("teacher-dashboard")}
       />
     )
   }

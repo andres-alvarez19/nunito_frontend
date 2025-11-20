@@ -14,59 +14,73 @@ interface StudentDashboardProps {
   onLeaveRoom: () => void
 }
 
-interface GameStatus {
-  id: string
-  name: string
-  isActive: boolean
-  timeRemaining: number
-  totalTime: number
-  difficulty: string
-  color: string
+interface Room {
+  id: string;
+  code: string;
+  name: string;
+  game: string;
+  difficulty: string;
+  duration: number;
+  teacherId: string;
+  students: string[];
+  isActive: boolean;
 }
 
 export function StudentDashboard({ studentName, roomCode, onStartGame, onLeaveRoom }: StudentDashboardProps) {
-  const [gameStatus, setGameStatus] = useState<GameStatus>({
-    id: "image-word",
-    name: "Asociación Imagen-Palabra",
-    isActive: false,
-    timeRemaining: 600, // 10 minutes
-    totalTime: 600,
-    difficulty: "Fácil",
-    color: "mint",
-  })
-  const [connectedStudents, setConnectedStudents] = useState(["Ana", "Carlos", "María", studentName])
-  const [isWaiting, setIsWaiting] = useState(true)
+  const [room, setRoom] = useState<Room | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Simulate game starting
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setGameStatus((prev) => ({ ...prev, isActive: true }))
-      setIsWaiting(false)
-    }, 5000)
+    const fetchRoom = async () => {
+      try {
+        const response = await fetch(`http://localhost:3001/api/rooms/${roomCode}`);
+        const data = await response.json();
+        setRoom(data);
+      } catch (error) {
+        console.error("Failed to fetch room:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    return () => clearTimeout(timer)
-  }, [])
+    fetchRoom();
+  }, [roomCode]);
 
-  // Timer countdown
   useEffect(() => {
-    if (gameStatus.isActive && gameStatus.timeRemaining > 0) {
-      const timer = setInterval(() => {
-        setGameStatus((prev) => ({
-          ...prev,
-          timeRemaining: prev.timeRemaining - 1,
-        }))
-      }, 1000)
-      return () => clearInterval(timer)
+    if (room) {
+      const ws = new WebSocket(`ws://localhost:3001?roomCode=${room.code}`);
+
+      ws.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        if (message.type === 'student-joined') {
+          setRoom(message.payload.room);
+        } else if (message.type === 'game-started') {
+          setRoom((prev) => prev ? { ...prev, isActive: true } : null);
+        }
+      };
+
+      return () => {
+        ws.close();
+      };
     }
-  }, [gameStatus.isActive, gameStatus.timeRemaining])
+  }, [room]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
+  if (isLoading) {
+    return <p>Cargando sala...</p>;
   }
 
-  const progressPercentage = ((gameStatus.totalTime - gameStatus.timeRemaining) / gameStatus.totalTime) * 100
+  if (!room) {
+    return <p>Sala no encontrada.</p>;
+  }
+
+  const { name, game, difficulty, students, isActive } = room;
+  
+  const gameNames = {
+    "image-word": "Asociación Imagen-Palabra",
+    "syllable-count": "Conteo de Sílabas",
+    "rhyme-identification": "Identificación de Rimas",
+    "audio-recognition": "Reconocimiento Auditivo",
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -89,7 +103,7 @@ export function StudentDashboard({ studentName, roomCode, onStartGame, onLeaveRo
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
-        {isWaiting ? (
+        {!isActive ? (
           /* Waiting Screen */
           <div className="text-center py-12">
             <div className="animate-pulse">
@@ -104,12 +118,12 @@ export function StudentDashboard({ studentName, roomCode, onStartGame, onLeaveRo
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 justify-center">
                   <Users className="h-5 w-5" />
-                  Estudiantes conectados ({connectedStudents.length})
+                  Estudiantes conectados ({students.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-2">
-                  {connectedStudents.map((student, index) => (
+                  {students.map((student, index) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span className={`text-sm ${student === studentName ? "font-bold" : ""}`}>{student}</span>
@@ -123,12 +137,12 @@ export function StudentDashboard({ studentName, roomCode, onStartGame, onLeaveRo
           /* Game Active Screen */
           <div className="space-y-6">
             {/* Game Status */}
-            <Card className={`bg-${gameStatus.color}-container border-${gameStatus.color}`}>
+            <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className={`text-${gameStatus.color} text-2xl`}>{gameStatus.name}</CardTitle>
-                    <CardDescription className="text-lg">Nivel: {gameStatus.difficulty}</CardDescription>
+                    <CardTitle className="text-2xl">{gameNames[game as keyof typeof gameNames]}</CardTitle>
+                    <CardDescription className="text-lg">Nivel: {difficulty}</CardDescription>
                   </div>
                   <Badge variant="default" className="text-lg px-4 py-2">
                     Activo
@@ -136,88 +150,14 @@ export function StudentDashboard({ studentName, roomCode, onStartGame, onLeaveRo
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Clock className="h-6 w-6 text-primary" />
-                  <div className="flex-1">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Tiempo restante</span>
-                      <span className="text-lg font-mono font-bold">{formatTime(gameStatus.timeRemaining)}</span>
-                    </div>
-                    <Progress value={progressPercentage} className="h-3" />
-                  </div>
-                </div>
-
                 <Button
-                  onClick={() => onStartGame(gameStatus.id)}
+                  onClick={() => onStartGame(game)}
                   className="w-full text-xl py-6"
                   size="lg"
-                  disabled={gameStatus.timeRemaining === 0}
                 >
                   <Zap className="h-6 w-6 mr-3" />
                   ¡Comenzar a Jugar!
                 </Button>
-              </CardContent>
-            </Card>
-
-            {/* Motivation Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="text-center">
-                <CardContent className="pt-6">
-                  <Trophy className="h-12 w-12 mx-auto text-yellow-500 mb-3" />
-                  <h3 className="font-bold text-lg">¡Tú puedes!</h3>
-                  <p className="text-sm text-muted-foreground">Haz tu mejor esfuerzo</p>
-                </CardContent>
-              </Card>
-
-              <Card className="text-center">
-                <CardContent className="pt-6">
-                  <Star className="h-12 w-12 mx-auto text-blue-500 mb-3" />
-                  <h3 className="font-bold text-lg">Aprende jugando</h3>
-                  <p className="text-sm text-muted-foreground">Cada respuesta te ayuda a crecer</p>
-                </CardContent>
-              </Card>
-
-              <Card className="text-center">
-                <CardContent className="pt-6">
-                  <Heart className="h-12 w-12 mx-auto text-red-500 mb-3" />
-                  <h3 className="font-bold text-lg">Diviértete</h3>
-                  <p className="text-sm text-muted-foreground">Lo importante es participar</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Instructions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Instrucciones del Juego</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
-                      1
-                    </div>
-                    <p>Observa cuidadosamente cada imagen que aparezca en pantalla</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
-                      2
-                    </div>
-                    <p>Lee todas las opciones de palabras disponibles</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
-                      3
-                    </div>
-                    <p>Selecciona la palabra que mejor corresponda a la imagen</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
-                      4
-                    </div>
-                    <p>Recibirás retroalimentación inmediata sobre tu respuesta</p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </div>
