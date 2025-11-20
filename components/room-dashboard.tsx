@@ -31,6 +31,7 @@ export function RoomDashboard({ room, teacherName, onStartGame, onEndGame, onVie
   const [currentRoom, setCurrentRoom] = useState(room)
   const [timeRemaining, setTimeRemaining] = useState(room.duration * 60)
   const [copied, setCopied] = useState(false)
+  const [studentAnswers, setStudentAnswers] = useState<{ [key: string]: any }>({});
 
   useEffect(() => {
     const ws = new WebSocket(`ws://localhost:3001?roomCode=${room.code}`);
@@ -39,6 +40,11 @@ export function RoomDashboard({ room, teacherName, onStartGame, onEndGame, onVie
       const message = JSON.parse(event.data);
       if (message.type === 'student-joined') {
         setCurrentRoom(message.payload.room);
+      } else if (message.type === 'student-answered') {
+        setStudentAnswers((prev) => ({
+          ...prev,
+          [message.payload.studentName]: message.payload.answer,
+        }));
       }
     };
 
@@ -192,9 +198,14 @@ export function RoomDashboard({ room, teacherName, onStartGame, onEndGame, onVie
                   <p className="text-muted-foreground text-center py-4">Esperando estudiantes...</p>
                 ) : (
                   currentRoom.students.map((student, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="font-medium">{student}</span>
+                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${studentAnswers[student] !== undefined ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        <span className="font-medium">{student}</span>
+                      </div>
+                      {studentAnswers[student] !== undefined && (
+                        <Badge variant="outline">{studentAnswers[student]}</Badge>
+                      )}
                     </div>
                   ))
                 )}

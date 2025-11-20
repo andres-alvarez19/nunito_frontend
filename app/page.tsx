@@ -248,6 +248,8 @@ export default function HomePage() {
         timeLimit={demoMode ? 60 : currentRoom?.duration || 60}
         onGameComplete={demoMode ? handleDemoGameComplete : handleGameComplete}
         onBack={() => setAppState("home")}
+        studentName={studentName}
+        roomCode={roomCode}
       />
     )
   }

@@ -16,18 +16,20 @@ interface SyllableQuestion {
 }
 
 interface SyllableCountGameProps {
-  onGameComplete: (results: GameResults) => void
-  difficulty: "easy" | "medium" | "hard"
-  timeLimit: number
+  onGameComplete: (results: GameResults) => void;
+  difficulty: "easy" | "medium" | "hard";
+  timeLimit: number;
+  studentName: string;
+  roomCode: string;
 }
 
 interface GameResults {
-  totalQuestions: number
-  correctAnswers: number
-  incorrectAnswers: number
-  averageTime: number
-  score: number
-  maxStreak: number
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  averageTime: number;
+  score: number;
+  maxStreak: number;
 }
 
 const gameQuestions: Record<string, SyllableQuestion[]> = {
@@ -123,7 +125,8 @@ const gameQuestions: Record<string, SyllableQuestion[]> = {
   ],
 }
 
-export function SyllableCountGame({ onGameComplete, difficulty, timeLimit }: SyllableCountGameProps) {
+export function SyllableCountGame({ onGameComplete, difficulty, timeLimit, studentName, roomCode }: SyllableCountGameProps) {
+  const [ws, setWs] = useState<WebSocket | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
@@ -147,6 +150,15 @@ export function SyllableCountGame({ onGameComplete, difficulty, timeLimit }: Syl
   const progress = ((currentQuestion + 1) / questions.length) * 100
 
   useEffect(() => {
+    const socket = new WebSocket(`ws://localhost:3001?roomCode=${roomCode}`);
+    setWs(socket);
+
+    return () => {
+      socket.close();
+    };
+  }, [roomCode]);
+  
+  useEffect(() => {
     if (timeRemaining > 0 && !showFeedback) {
       const timer = setInterval(() => {
         setTimeRemaining((prev) => prev - 1)
@@ -156,7 +168,7 @@ export function SyllableCountGame({ onGameComplete, difficulty, timeLimit }: Syl
       handleTimeUp()
     }
   }, [timeRemaining, showFeedback])
-
+  
   useEffect(() => {
     setQuestionStartTime(Date.now())
   }, [currentQuestion])
@@ -177,6 +189,16 @@ export function SyllableCountGame({ onGameComplete, difficulty, timeLimit }: Syl
 
   const handleAnswerSelect = (answer: number) => {
     if (showFeedback) return
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'student-answered',
+        payload: {
+          studentName,
+          answer,
+        }
+      }));
+    }
 
     const responseTime = (Date.now() - questionStartTime) / 1000
     const correct = answer === currentQ.correctCount

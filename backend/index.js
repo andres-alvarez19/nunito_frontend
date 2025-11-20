@@ -152,6 +152,16 @@ wss.on('connection', (ws, req) => {
 
     ws.on('message', (message) => {
       console.log(`Received message from room ${roomCode}: ${message}`);
+      const parsedMessage = JSON.parse(message);
+      if (parsedMessage.type === 'student-answered') {
+        broadcastToRoom(roomCode, {
+          type: 'student-answered',
+          payload: {
+            studentName: parsedMessage.payload.studentName,
+            answer: parsedMessage.payload.answer,
+          },
+        });
+      }
     });
   }
 });
