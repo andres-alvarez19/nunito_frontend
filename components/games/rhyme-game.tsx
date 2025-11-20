@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import useSound from 'use-sound';
 import { GameLayout } from "./game-layout";
 import { CheckCircle, XCircle, Volume2 } from "lucide-react"
 
@@ -114,8 +113,8 @@ export function RhymeGame({ onGameComplete, difficulty, timeLimit, studentName, 
   const [showHint, setShowHint] = useState(false)
   const [rhymeAnimation, setRhymeAnimation] = useState(false)
 
-  const [playCorrect] = useSound('/correct-answer.wav');
-  const [playIncorrect] = useSound('/incorrect-answer.wav');
+  const correctAudio = typeof Audio !== 'undefined' ? new Audio('/correct-answer.wav') : null;
+  const incorrectAudio = typeof Audio !== 'undefined' ? new Audio('/incorrect-answer.wav') : null;
 
   const questions = gameQuestions[difficulty] || gameQuestions.easy
   const currentQ = questions[currentQuestion]
@@ -181,10 +180,10 @@ export function RhymeGame({ onGameComplete, difficulty, timeLimit, studentName, 
 
     const isCorrect = correctSelections.length === currentQ.correctRhymes.length && incorrectSelections.length === 0
 
-    if (isCorrect) {
-      playCorrect();
-    } else {
-      playIncorrect();
+    if (isCorrect && correctAudio) {
+      correctAudio.play();
+    } else if (incorrectAudio) {
+      incorrectAudio.play();
     }
 
     setShowFeedback(true)

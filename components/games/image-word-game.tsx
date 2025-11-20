@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import useSound from 'use-sound';
 import { GameLayout } from "./game-layout";
 import { CheckCircle, XCircle } from "lucide-react"
 
@@ -131,8 +130,8 @@ export function ImageWordGame({ onGameComplete, difficulty, timeLimit, studentNa
   const [maxStreak, setMaxStreak] = useState(0)
   const [celebrationMode, setCelebrationMode] = useState(false)
   
-  const [playCorrect] = useSound('/correct-answer.wav');
-  const [playIncorrect] = useSound('/incorrect-answer.wav');
+  const correctAudio = typeof Audio !== 'undefined' ? new Audio('/correct-answer.wav') : null;
+  const incorrectAudio = typeof Audio !== 'undefined' ? new Audio('/incorrect-answer.wav') : null;
 
   const questions = gameQuestions[difficulty] || gameQuestions.easy
   const currentQ = questions[currentQuestion]
@@ -193,10 +192,10 @@ export function ImageWordGame({ onGameComplete, difficulty, timeLimit, studentNa
     const responseTime = (Date.now() - questionStartTime) / 1000
     const correct = answer === currentQ.correctAnswer
 
-    if (correct) {
-      playCorrect();
-    } else {
-      playIncorrect();
+    if (correct && correctAudio) {
+      correctAudio.play();
+    } else if (incorrectAudio) {
+      incorrectAudio.play();
     }
 
     setSelectedAnswer(answer)
