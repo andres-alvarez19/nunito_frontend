@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Clock, Star } from "lucide-react"
+import useSound from 'use-sound';
+import { GameLayout } from "./game-layout";
+import { CheckCircle, XCircle } from "lucide-react"
 
 interface GameQuestion {
   id: number
@@ -16,18 +18,20 @@ interface GameQuestion {
 }
 
 interface ImageWordGameProps {
-  onGameComplete: (results: GameResults) => void
-  difficulty: "easy" | "medium" | "hard"
-  timeLimit: number
+  onGameComplete: (results: GameResults) => void;
+  difficulty: "easy" | "medium" | "hard";
+  timeLimit: number;
+  studentName: string;
+  roomCode: string;
 }
 
 interface GameResults {
-  totalQuestions: number
-  correctAnswers: number
-  incorrectAnswers: number
-  averageTime: number
-  score: number
-  maxStreak: number
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  averageTime: number;
+  score: number;
+  maxStreak: number;
 }
 
 const gameQuestions: Record<string, GameQuestion[]> = {
@@ -109,7 +113,8 @@ const gameQuestions: Record<string, GameQuestion[]> = {
   ],
 }
 
-export function ImageWordGame({ onGameComplete, difficulty, timeLimit }: ImageWordGameProps) {
+export function ImageWordGame({ onGameComplete, difficulty, timeLimit, studentName, roomCode }: ImageWordGameProps) {
+  const [ws, setWs] = useState<WebSocket | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
@@ -125,10 +130,22 @@ export function ImageWordGame({ onGameComplete, difficulty, timeLimit }: ImageWo
   const [streak, setStreak] = useState(0)
   const [maxStreak, setMaxStreak] = useState(0)
   const [celebrationMode, setCelebrationMode] = useState(false)
+  
+  const [playCorrect] = useSound('/correct-answer.wav');
+  const [playIncorrect] = useSound('/incorrect-answer.wav');
 
   const questions = gameQuestions[difficulty] || gameQuestions.easy
   const currentQ = questions[currentQuestion]
   const progress = ((currentQuestion + 1) / questions.length) * 100
+
+  useEffect(() => {
+    const socket = new WebSocket(`ws://localhost:3001?roomCode=${roomCode}`);
+    setWs(socket);
+
+    return () => {
+      socket.close();
+    };
+  }, [roomCode]);
 
   // Timer countdown
   useEffect(() => {
@@ -163,8 +180,24 @@ export function ImageWordGame({ onGameComplete, difficulty, timeLimit }: ImageWo
   const handleAnswerSelect = (answer: string) => {
     if (showFeedback) return
 
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: 'student-answered',
+        payload: {
+          studentName,
+          answer,
+        }
+      }));
+    }
+
     const responseTime = (Date.now() - questionStartTime) / 1000
     const correct = answer === currentQ.correctAnswer
+
+    if (correct) {
+      playCorrect();
+    } else {
+      playIncorrect();
+    }
 
     setSelectedAnswer(answer)
     setIsCorrect(correct)
@@ -216,170 +249,134 @@ export function ImageWordGame({ onGameComplete, difficulty, timeLimit }: ImageWo
     }
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
   return (
-    <div
-      className={`min-h-screen bg-mint-container p-4 transition-all duration-500 ${celebrationMode ? "animate-pulse" : ""}`}
+    <GameLayout
+      title="Asociación Imagen-Palabra"
+      description={`Pregunta ${currentQuestion + 1} de ${questions.length}`}
+      progress={progress}
+      timeRemaining={timeRemaining}
+      correctAnswers={results.correctAnswers}
+      totalQuestions={questions.length}
     >
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <Card className="bg-mint text-mint-on">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Image */}
+        <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">Asociación Imagen-Palabra</CardTitle>
-                <CardDescription className="text-mint-on/80">
-                  Pregunta {currentQuestion + 1} de {questions.length}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {formatTime(timeRemaining)}
-                </Badge>
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  <Star className="h-4 w-4 mr-1" />
-                  {results.correctAnswers}/{questions.length}
-                </Badge>
-                {streak > 0 && (
-                  <Badge
-                    className={`text-lg px-3 py-1 ${streak >= 3 ? "bg-yellow-500 animate-bounce" : "bg-blue-500"}`}
-                  >
-                    🔥 {streak}
-                  </Badge>
+            <CardTitle className="text-center">¿Qué ves en la imagen?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-center">
+              <div className="relative">
+                <img
+                  src={currentQ.image || "/placeholder.svg"}
+                  alt="Imagen del juego"
+                  className={`w-64 h-64 object-cover rounded-lg border-4 border-mint transition-transform duration-300 ${
+                    celebrationMode ? "scale-105" : "hover:scale-102"
+                  }`}
+                />
+                {showFeedback && (
+                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                    {isCorrect ? (
+                      <CheckCircle className="h-16 w-16 text-green-500 animate-bounce" />
+                    ) : (
+                      <XCircle className="h-16 w-16 text-red-500 animate-pulse" />
+                    )}
+                  </div>
                 )}
               </div>
             </div>
-            <Progress value={progress} className="mt-4" />
-          </CardHeader>
+
+            {!showFeedback && (
+              <div className="text-center">
+                <Button variant="outline" size="sm" onClick={() => setShowHint(!showHint)} className="text-sm">
+                  {showHint ? "Ocultar pista" : "💡 Ver pista"}
+                </Button>
+                {showHint && (
+                  <p className="mt-2 text-sm text-muted-foreground bg-yellow-50 p-2 rounded">{currentQ.hint}</p>
+                )}
+              </div>
+            )}
+          </CardContent>
         </Card>
 
-        {/* Game Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Image */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">¿Qué ves en la imagen?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-center">
-                <div className="relative">
-                  <img
-                    src={currentQ.image || "/placeholder.svg"}
-                    alt="Imagen del juego"
-                    className={`w-64 h-64 object-cover rounded-lg border-4 border-mint transition-transform duration-300 ${
-                      celebrationMode ? "scale-105" : "hover:scale-102"
-                    }`}
-                  />
-                  {showFeedback && (
-                    <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                      {isCorrect ? (
-                        <CheckCircle className="h-16 w-16 text-green-500 animate-bounce" />
-                      ) : (
-                        <XCircle className="h-16 w-16 text-red-500 animate-pulse" />
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+        {/* Options */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">Selecciona la palabra correcta</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {currentQ.options.map((option, index) => {
+              let buttonVariant: "default" | "destructive" | "secondary" = "secondary"
+              let buttonClass = "w-full text-lg py-4 h-auto transition-all duration-200 hover:scale-105"
 
-              {!showFeedback && (
-                <div className="text-center">
-                  <Button variant="outline" size="sm" onClick={() => setShowHint(!showHint)} className="text-sm">
-                    {showHint ? "Ocultar pista" : "💡 Ver pista"}
-                  </Button>
-                  {showHint && (
-                    <p className="mt-2 text-sm text-muted-foreground bg-yellow-50 p-2 rounded">{currentQ.hint}</p>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Options */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Selecciona la palabra correcta</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {currentQ.options.map((option, index) => {
-                let buttonVariant: "default" | "destructive" | "secondary" = "secondary"
-                let buttonClass = "w-full text-lg py-4 h-auto transition-all duration-200 hover:scale-105"
-
-                if (showFeedback) {
-                  if (option === currentQ.correctAnswer) {
-                    buttonVariant = "default"
-                    buttonClass += " bg-green-500 hover:bg-green-600 text-white animate-pulse"
-                  } else if (option === selectedAnswer && !isCorrect) {
-                    buttonVariant = "destructive"
-                    buttonClass += " animate-shake"
-                  }
+              if (showFeedback) {
+                if (option === currentQ.correctAnswer) {
+                  buttonVariant = "default"
+                  buttonClass += " bg-green-500 hover:bg-green-600 text-white animate-pulse"
+                } else if (option === selectedAnswer && !isCorrect) {
+                  buttonVariant = "destructive"
+                  buttonClass += " animate-shake"
                 }
+              }
 
-                return (
-                  <Button
-                    key={index}
-                    variant={buttonVariant}
-                    className={buttonClass}
-                    onClick={() => handleAnswerSelect(option)}
-                    disabled={showFeedback}
-                  >
-                    {option}
-                  </Button>
-                )
-              })}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Feedback */}
-        {showFeedback && (
-          <Card
-            className={`${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"} transition-all duration-500`}
-          >
-            <CardContent className="pt-6">
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-2">
-                  {isCorrect ? (
-                    <>
-                      <CheckCircle className="h-8 w-8 text-green-500" />
-                      <span className="text-2xl font-bold text-green-700">
-                        {streak >= 3 ? "¡INCREÍBLE RACHA!" : "¡Correcto!"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-8 w-8 text-red-500" />
-                      <span className="text-2xl font-bold text-red-700">Incorrecto</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-lg">
-                  {isCorrect
-                    ? streak >= 3
-                      ? `¡Fantástico! Llevas ${streak} respuestas correctas seguidas. ¡Sigue así!`
-                      : "¡Excelente trabajo! Has seleccionado la respuesta correcta."
-                    : `La respuesta correcta era: ${currentQ.correctAnswer}`}
-                </p>
-                <Button onClick={handleNextQuestion} size="lg" className="text-lg px-8 animate-bounce">
-                  {currentQuestion < questions.length - 1 ? "Siguiente Pregunta" : "Ver Resultados"}
+              return (
+                <Button
+                  key={index}
+                  variant={buttonVariant}
+                  className={buttonClass}
+                  onClick={() => handleAnswerSelect(option)}
+                  disabled={showFeedback}
+                >
+                  {option}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {celebrationMode && (
-          <div className="fixed inset-0 pointer-events-none flex items-center justify-center z-50">
-            <div className="text-6xl animate-bounce">🎉</div>
-          </div>
-        )}
+              )
+            })}
+          </CardContent>
+        </Card>
       </div>
-    </div>
-  )
+
+      {/* Feedback */}
+      {showFeedback && (
+        <Card
+          className={`${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"} transition-all duration-500`}
+        >
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="flex items-center justify-center gap-2">
+                {isCorrect ? (
+                  <>
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                    <span className="text-2xl font-bold text-green-700">
+                      {streak >= 3 ? "¡INCREÍBLE RACHA!" : "¡Correcto!"}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-8 w-8 text-red-500" />
+                    <span className="text-2xl font-bold text-red-700">Incorrecto</span>
+                  </>
+                )}
+              </div>
+              <p className="text-lg">
+                {isCorrect
+                  ? streak >= 3
+                    ? `¡Fantástico! Llevas ${streak} respuestas correctas seguidas. ¡Sigue así!`
+                    : "¡Excelente trabajo! Has seleccionado la respuesta correcta."
+                  : `La respuesta correcta era: ${currentQ.correctAnswer}`}
+              </p>
+              <Button onClick={handleNextQuestion} size="lg" className="text-lg px-8 animate-bounce">
+                {currentQuestion < questions.length - 1 ? "Siguiente Pregunta" : "Ver Resultados"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {celebrationMode && (
+        <div className="fixed inset-0 pointer-events-none flex items-center justify-center z-50">
+          <div className="text-6xl animate-bounce">🎉</div>
+        </div>
+      )}
+    </GameLayout>
+  );
 }

@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Clock, Star, Hash, Volume2 } from "lucide-react"
+import useSound from 'use-sound';
+import { GameLayout } from "./game-layout";
+import { CheckCircle, XCircle, Hash, Volume2 } from "lucide-react"
 
 interface SyllableQuestion {
   id: number
@@ -145,6 +147,9 @@ export function SyllableCountGame({ onGameComplete, difficulty, timeLimit, stude
   const [showHint, setShowHint] = useState(false)
   const [syllableAnimation, setSyllableAnimation] = useState(false)
 
+  const [playCorrect] = useSound('/correct-answer.wav');
+  const [playIncorrect] = useSound('/incorrect-answer.wav');
+
   const questions = gameQuestions[difficulty] || gameQuestions.easy
   const currentQ = questions[currentQuestion]
   const progress = ((currentQuestion + 1) / questions.length) * 100
@@ -202,6 +207,12 @@ export function SyllableCountGame({ onGameComplete, difficulty, timeLimit, stude
 
     const responseTime = (Date.now() - questionStartTime) / 1000
     const correct = answer === currentQ.correctCount
+
+    if (correct) {
+      playCorrect();
+    } else {
+      playIncorrect();
+    }
 
     setSelectedAnswer(answer)
     setIsCorrect(correct)
@@ -266,189 +277,155 @@ export function SyllableCountGame({ onGameComplete, difficulty, timeLimit, stude
     }
   }
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
   return (
-    <div
-      className={`min-h-screen bg-pastel-container p-4 transition-all duration-500 ${celebrationMode ? "animate-pulse" : ""}`}
+    <GameLayout
+      title="Conteo de Sílabas"
+      description={`Pregunta ${currentQuestion + 1} de ${questions.length}`}
+      progress={progress}
+      timeRemaining={timeRemaining}
+      correctAnswers={results.correctAnswers}
+      totalQuestions={questions.length}
     >
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Card className="bg-pastel text-pastel-on">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl">Conteo de Sílabas</CardTitle>
-                <CardDescription className="text-pastel-on/80">
-                  Pregunta {currentQuestion + 1} de {questions.length}
-                </CardDescription>
+            <CardTitle className="text-center">¿Cuántas sílabas tiene esta palabra?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="text-center">
+              <div
+                className={`bg-pastel text-pastel-on rounded-lg p-8 mb-4 transition-transform duration-300 ${
+                  celebrationMode ? "scale-105" : "hover:scale-102"
+                }`}
+              >
+                <span className="text-6xl font-bold">{currentQ.word}</span>
               </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  <Clock className="h-4 w-4 mr-1" />
-                  {formatTime(timeRemaining)}
-                </Badge>
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  <Star className="h-4 w-4 mr-1" />
-                  {results.correctAnswers}/{questions.length}
-                </Badge>
-                {streak > 0 && (
-                  <Badge
-                    className={`text-lg px-3 py-1 ${streak >= 3 ? "bg-yellow-500 animate-bounce" : "bg-blue-500"}`}
-                  >
-                    🔥 {streak}
-                  </Badge>
+
+              <div className="space-y-2">
+                <Button variant="outline" size="sm" onClick={pronounceWord} className="mr-2 bg-transparent">
+                  <Volume2 className="h-4 w-4 mr-1" />
+                  Escuchar
+                </Button>
+
+                {!showFeedback && (
+                  <Button variant="outline" size="sm" onClick={() => setShowHint(!showHint)}>
+                    {showHint ? "Ocultar pista" : "💡 Ver pista"}
+                  </Button>
                 )}
               </div>
+
+              {showHint && !showFeedback && (
+                <p className="mt-2 text-sm text-muted-foreground bg-yellow-50 p-2 rounded">
+                  Separa la palabra en partes pequeñas que puedas pronunciar de una vez
+                </p>
+              )}
             </div>
-            <Progress value={progress} className="mt-4" />
-          </CardHeader>
+
+            {showSyllables && (
+              <div className="text-center space-y-4">
+                <h4 className="text-lg font-semibold">División silábica:</h4>
+                <div className="flex justify-center gap-2 flex-wrap">
+                  {currentQ.syllables.map((syllable, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className={`text-lg px-3 py-2 transition-all duration-300 ${
+                        syllableAnimation ? "animate-bounce" : ""
+                      }`}
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      {syllable}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">¿Cuántas sílabas tiene esta palabra?</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="text-center">
-                <div
-                  className={`bg-pastel text-pastel-on rounded-lg p-8 mb-4 transition-transform duration-300 ${
-                    celebrationMode ? "scale-105" : "hover:scale-102"
-                  }`}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center flex items-center justify-center gap-2">
+              <Hash className="h-6 w-6" />
+              Número de sílabas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {currentQ.options.map((option, index) => {
+              let buttonVariant: "default" | "destructive" | "secondary" = "secondary"
+              let buttonClass = "w-full text-2xl py-6 h-auto font-bold transition-all duration-200 hover:scale-105"
+
+              if (showFeedback) {
+                if (option === currentQ.correctCount) {
+                  buttonVariant = "default"
+                  buttonClass += " bg-green-500 hover:bg-green-600 text-white animate-pulse"
+                } else if (option === selectedAnswer && !isCorrect) {
+                  buttonVariant = "destructive"
+                  buttonClass += " animate-shake"
+                }
+              }
+
+              return (
+                <Button
+                  key={index}
+                  variant={buttonVariant}
+                  className={buttonClass}
+                  onClick={() => handleAnswerSelect(option)}
+                  disabled={showFeedback}
                 >
-                  <span className="text-6xl font-bold">{currentQ.word}</span>
-                </div>
+                  {option} {option === 1 ? "sílaba" : "sílabas"}
+                </Button>
+              )
+            })}
+          </CardContent>
+        </Card>
+      </div>
 
-                <div className="space-y-2">
-                  <Button variant="outline" size="sm" onClick={pronounceWord} className="mr-2 bg-transparent">
-                    <Volume2 className="h-4 w-4 mr-1" />
-                    Escuchar
-                  </Button>
-
-                  {!showFeedback && (
-                    <Button variant="outline" size="sm" onClick={() => setShowHint(!showHint)}>
-                      {showHint ? "Ocultar pista" : "💡 Ver pista"}
-                    </Button>
-                  )}
-                </div>
-
-                {showHint && !showFeedback && (
-                  <p className="mt-2 text-sm text-muted-foreground bg-yellow-50 p-2 rounded">
-                    Separa la palabra en partes pequeñas que puedas pronunciar de una vez
-                  </p>
+      {showFeedback && (
+        <Card
+          className={`${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"} transition-all duration-500`}
+        >
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="flex items-center justify-center gap-2">
+                {isCorrect ? (
+                  <>
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                    <span className="text-2xl font-bold text-green-700">
+                      {streak >= 3 ? "¡INCREÍBLE RACHA!" : "¡Correcto!"}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-8 w-8 text-red-500" />
+                    <span className="text-2xl font-bold text-red-700">Incorrecto</span>
+                  </>
                 )}
               </div>
-
-              {showSyllables && (
-                <div className="text-center space-y-4">
-                  <h4 className="text-lg font-semibold">División silábica:</h4>
-                  <div className="flex justify-center gap-2 flex-wrap">
-                    {currentQ.syllables.map((syllable, index) => (
-                      <Badge
-                        key={index}
-                        variant="outline"
-                        className={`text-lg px-3 py-2 transition-all duration-300 ${
-                          syllableAnimation ? "animate-bounce" : ""
-                        }`}
-                        style={{ animationDelay: `${index * 0.1}s` }}
-                      >
-                        {syllable}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center flex items-center justify-center gap-2">
-                <Hash className="h-6 w-6" />
-                Número de sílabas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {currentQ.options.map((option, index) => {
-                let buttonVariant: "default" | "destructive" | "secondary" = "secondary"
-                let buttonClass = "w-full text-2xl py-6 h-auto font-bold transition-all duration-200 hover:scale-105"
-
-                if (showFeedback) {
-                  if (option === currentQ.correctCount) {
-                    buttonVariant = "default"
-                    buttonClass += " bg-green-500 hover:bg-green-600 text-white animate-pulse"
-                  } else if (option === selectedAnswer && !isCorrect) {
-                    buttonVariant = "destructive"
-                    buttonClass += " animate-shake"
-                  }
-                }
-
-                return (
-                  <Button
-                    key={index}
-                    variant={buttonVariant}
-                    className={buttonClass}
-                    onClick={() => handleAnswerSelect(option)}
-                    disabled={showFeedback}
-                  >
-                    {option} {option === 1 ? "sílaba" : "sílabas"}
-                  </Button>
-                )
-              })}
-            </CardContent>
-          </Card>
-        </div>
-
-        {showFeedback && (
-          <Card
-            className={`${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"} transition-all duration-500`}
-          >
-            <CardContent className="pt-6">
-              <div className="text-center space-y-4">
-                <div className="flex items-center justify-center gap-2">
-                  {isCorrect ? (
-                    <>
-                      <CheckCircle className="h-8 w-8 text-green-500" />
-                      <span className="text-2xl font-bold text-green-700">
-                        {streak >= 3 ? "¡INCREÍBLE RACHA!" : "¡Correcto!"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-8 w-8 text-red-500" />
-                      <span className="text-2xl font-bold text-red-700">Incorrecto</span>
-                    </>
-                  )}
-                </div>
-                <p className="text-lg">
-                  {isCorrect
-                    ? streak >= 3
-                      ? `¡Fantástico! Llevas ${streak} respuestas correctas seguidas. ¡Sigue así!`
-                      : `¡Excelente! La palabra "${currentQ.word}" tiene ${currentQ.correctCount} ${
-                          currentQ.correctCount === 1 ? "sílaba" : "sílabas"
-                        }.`
-                    : `La palabra "${currentQ.word}" tiene ${currentQ.correctCount} ${
+              <p className="text-lg">
+                {isCorrect
+                  ? streak >= 3
+                    ? `¡Fantástico! Llevas ${streak} respuestas correctas seguidas. ¡Sigue así!`
+                    : `¡Excelente! La palabra "${currentQ.word}" tiene ${currentQ.correctCount} ${
                         currentQ.correctCount === 1 ? "sílaba" : "sílabas"
-                      }.`}
-                </p>
-                <Button onClick={handleNextQuestion} size="lg" className="text-lg px-8 animate-bounce">
-                  {currentQuestion < questions.length - 1 ? "Siguiente Pregunta" : "Ver Resultados"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                      }.`
+                  : `La palabra "${currentQ.word}" tiene ${currentQ.correctCount} ${
+                      currentQ.correctCount === 1 ? "sílaba" : "sílabas"
+                    }.`}
+              </p>
+              <Button onClick={handleNextQuestion} size="lg" className="text-lg px-8 animate-bounce">
+                {currentQuestion < questions.length - 1 ? "Siguiente Pregunta" : "Ver Resultados"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-        {celebrationMode && (
-          <div className="fixed inset-0 pointer-events-none flex items-center justify-center z-50">
-            <div className="text-6xl animate-bounce">🎉</div>
-          </div>
-        )}
-      </div>
-    </div>
+      {celebrationMode && (
+        <div className="fixed inset-0 pointer-events-none flex items-center justify-center z-50">
+          <div className="text-6xl animate-bounce">🎉</div>
+        </div>
+      )}
+    </GameLayout>
   )
 }
