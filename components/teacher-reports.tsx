@@ -42,48 +42,41 @@ export function TeacherReports({ teacherId, teacherName, onBack }: TeacherReport
   useEffect(() => {
     const fetchReports = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/rooms/all/results?teacherId=${teacherId}`);
-        const data = await response.json();
-        
-        // Process the data to group results by room
-        const reportsByRoom = data.reduce((acc, result) => {
-          const { roomCode, studentName, results, timestamp } = result;
-          if (!acc[roomCode]) {
-            acc[roomCode] = {
-              roomId: roomCode,
-              roomName: `Sala ${roomCode}`, // You might want to fetch room details for a better name
-              gameId: 'image-word', // This should come from room details
-              difficulty: 'easy', // This should come from room details
-              studentsCount: 0,
-              averageScore: 0,
-              completionRate: 0,
-              createdAt: timestamp,
-              students: [],
-            };
-          }
-          
-          acc[roomCode].students.push({
-            name: studentName,
-            gameId: 'image-word',
-            score: results.score,
-            correctAnswers: results.correctAnswers,
-            totalQuestions: results.totalQuestions,
-            averageTime: results.averageTime,
-            completedAt: timestamp,
-          });
-          
-          return acc;
-        }, {} as { [key: string]: RoomReport });
+        const roomsResponse = await fetch(`http://localhost:3001/api/teachers/${teacherId}/rooms`);
+        const rooms = await roomsResponse.json();
 
-        // Calculate aggregate values
-        Object.values(reportsByRoom).forEach(report => {
-          report.studentsCount = report.students.length;
-          const totalScore = report.students.reduce((sum, s) => sum + s.score, 0);
-          report.averageScore = report.students.length > 0 ? totalScore / report.students.length : 0;
-          report.completionRate = report.students.length > 0 ? 100 : 0; // This is a simplified calculation
+        const reportsPromises = rooms.map(async (room) => {
+          const resultsResponse = await fetch(`http://localhost:3001/api/rooms/${room.code}/results`);
+          const results = await resultsResponse.json();
+
+          const students = results.map(result => ({
+            name: result.studentName,
+            gameId: room.game,
+            score: result.results.score,
+            correctAnswers: result.results.correctAnswers,
+            totalQuestions: result.results.totalQuestions,
+            averageTime: result.results.averageTime,
+            completedAt: result.timestamp,
+          }));
+
+          const totalScore = students.reduce((sum, s) => sum + s.score, 0);
+          const averageScore = students.length > 0 ? totalScore / students.length : 0;
+          
+          return {
+            roomId: room.code,
+            roomName: room.name,
+            gameId: room.game,
+            difficulty: room.difficulty,
+            studentsCount: students.length,
+            averageScore,
+            completionRate: students.length > 0 ? 100 : 0, // This is a simplified calculation
+            createdAt: room.id,
+            students,
+          };
         });
 
-        setReports(Object.values(reportsByRoom));
+        const reports = await Promise.all(reportsPromises);
+        setReports(reports);
       } catch (error) {
         console.error("Failed to fetch reports:", error);
       }
