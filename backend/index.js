@@ -68,12 +68,10 @@ app.post('/api/rooms/:roomCode/results', (req, res) => {
 app.get('/api/rooms/:roomCode/results', (req, res) => {
   console.log(`Getting results for room ${req.params.roomCode}`);
   const { roomCode } = req.params;
-  const results = gameResults.filter(r => r.code === roomCode);
+  const results = gameResults.filter(r => r.roomCode === roomCode);
   console.log(`Found ${results.length} results for room ${roomCode}`);
   res.json(results);
 });
-
-
 
 app.get('/api/rooms/all/results', (req, res) => {
   console.log('Getting all results');
