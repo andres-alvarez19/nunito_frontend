@@ -12,6 +12,7 @@ import {
   gameDefinitions,
   gameThemeTokens,
 } from "@/features/home/constants/games";
+import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 import type { Room, Teacher } from "@/features/home/types";
 
@@ -94,7 +95,7 @@ export default function RoomCreation({
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.header}>
-        <Text style={styles.title}>Crear nueva sala</Text>
+        <Text style={styles.header}>Crear nueva sala</Text>
         <Text style={styles.subtitle}>
           Hola {teacher.name}, completa la información para tu sesión.
         </Text>
@@ -217,27 +218,25 @@ export default function RoomCreation({
           </View>
         </View>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={[
-            styles.primaryButton,
-            (!isValid || isSubmitting) && styles.disabledButton,
-          ]}
+        <NunitoButton
+          style={(!isValid || isSubmitting) && styles.disabledButton}
           disabled={!isValid || isSubmitting}
           onPress={handleSubmit}
         >
           <Text style={styles.primaryButtonText}>
             {isSubmitting ? "Creando sala..." : "Crear sala"}
           </Text>
-        </TouchableOpacity>
+        </NunitoButton>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          onPress={onBack}
-          style={styles.secondaryButton}
-        >
-          <Text style={styles.secondaryButtonText}>Cancelar</Text>
-        </TouchableOpacity>
+        <NunitoButton contentStyle={styles.secondaryButton}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            onPress={onBack}
+            style={styles.secondaryButtonInner}
+          >
+            <Text style={styles.secondaryButtonText}>Cancelar</Text>
+          </TouchableOpacity>
+        </NunitoButton>
       </View>
     </ScrollView>
   );
@@ -352,31 +351,24 @@ const styles = StyleSheet.create({
     color: palette.muted,
   },
   primaryButton: {
-    backgroundColor: palette.primary,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
   },
   disabledButton: {
     opacity: 0.6,
   },
   primaryButtonText: {
-    color: palette.primaryOn,
+    color: palette.text,
     fontWeight: "700",
     fontSize: 16,
   },
   secondaryButton: {
     paddingVertical: 12,
-    alignItems: "center",
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.primary,
     backgroundColor: withAlpha(palette.primary, 0.05),
+  },
+  secondaryButtonInner: {
+    alignItems: "center",
   },
   secondaryButtonText: {
     color: palette.primary,

@@ -1,3 +1,4 @@
+import "./global.css"
 import { registerRootComponent } from 'expo';
 
 // Start the app from `app/index.tsx` so the app's index route is used as the

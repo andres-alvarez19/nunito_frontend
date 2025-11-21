@@ -1,17 +1,12 @@
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ScrollView, Text, View } from "react-native";
 
+import NunitoButton from "@/features/home/components/NunitoButton";
 import {
   gameDefinitions,
   gameThemeTokens,
 } from "@/features/home/constants/games";
 import type { GameResults } from "@/features/home/types";
-import { palette, withAlpha } from "@/theme/colors";
+import { withAlpha } from "@/theme/colors";
 
 interface StudentResultsProps {
   studentName: string;
@@ -31,14 +26,9 @@ export default function StudentResults({
   const gameDefinition = gameDefinitions.find(
     (definition) => definition.id === gameId,
   );
-  const fallbackTheme = {
-    accent: palette.primary,
-    container: withAlpha(palette.primary, 0.12),
-    on: palette.primaryOn,
-  };
   const theme = gameDefinition
     ? gameThemeTokens[gameDefinition.color]
-    : fallbackTheme;
+    : { accent: "#16a34a", container: "#ecfdf3", on: "#ffffff" };
   const gameName = gameDefinition?.name ?? "mini juego";
 
   const getPerformanceMessage = (score: number) => {
@@ -48,32 +38,49 @@ export default function StudentResults({
     return "¡Sigue practicando!";
   };
 
+  const getPerformanceIcon = (score: number) => {
+    if (score >= 90) return "🏆";
+    if (score >= 70) return "🎖️";
+    if (score >= 50) return "⭐";
+    return "🎯";
+  };
+
   const getStarRating = (score: number) => {
     if (score >= 90) return 3;
     if (score >= 70) return 2;
     return 1;
   };
+  const achievementPalette: Record<string, { background: string; border: string }> = {
+    "#F59E0B": { background: "#FEF3C7", border: "#FDE68A" },
+    "#22C55E": { background: "#ECFDF3", border: "#BBF7D0" },
+    "#3B82F6": { background: "#EFF6FF", border: "#BFDBFE" },
+    "#8B5CF6": { background: "#F5F3FF", border: "#DDD6FE" },
+  };
 
   const starRating = getStarRating(results.score);
   const performanceMessage = getPerformanceMessage(results.score);
+  const formatTime = (seconds: number) => `${seconds.toFixed(1)}s`;
+  const performanceIcon = getPerformanceIcon(results.score);
 
   const stats = [
     { label: "Total de preguntas", value: results.totalQuestions.toString() },
     { label: "Correctas", value: results.correctAnswers.toString() },
     { label: "Incorrectas", value: results.incorrectAnswers.toString() },
-    { label: "Tiempo promedio", value: `${results.averageTime}s` },
+    { label: "Tiempo promedio", value: formatTime(results.averageTime) },
   ];
 
   const achievements: Array<{
     title: string;
     description: string;
     accent: string;
+    icon: string;
   }> = [];
   if (results.score >= 90) {
     achievements.push({
       title: "¡Maestro del juego!",
       description: "Obtuviste más del 90% de respuestas correctas.",
       accent: "#F59E0B",
+      icon: "🏆",
     });
   }
   if (results.correctAnswers === results.totalQuestions) {
@@ -81,6 +88,7 @@ export default function StudentResults({
       title: "¡Perfecto!",
       description: "Respondiste todas las preguntas correctamente.",
       accent: "#22C55E",
+      icon: "🎯",
     });
   }
   if (results.averageTime <= 10) {
@@ -88,6 +96,7 @@ export default function StudentResults({
       title: "¡Rápido como el rayo!",
       description: "Tu tiempo promedio fue menor a 10 segundos.",
       accent: "#3B82F6",
+      icon: "⏱️",
     });
   }
   if (results.score >= 50) {
@@ -95,82 +104,129 @@ export default function StudentResults({
       title: "¡Buen trabajo!",
       description: "Completaste el juego exitosamente.",
       accent: "#8B5CF6",
+      icon: "⭐",
     });
   }
 
   return (
-    <ScrollView style={styles.wrapper} contentContainerStyle={styles.content}>
-      <View style={[styles.heroCard, { backgroundColor: theme.accent }]}>
-        <Text style={styles.heroTitle}>¡Juego completado!</Text>
-        <Text style={styles.heroSubtitle}>
+    <ScrollView
+      className="flex-1"
+      style={{ backgroundColor: theme.container }}
+      contentContainerClassName="px-6 pb-10 space-y-5"
+    >
+      <View
+        className="rounded-3xl p-7 shadow-md"
+        style={{ backgroundColor: theme.accent }}
+      >
+        <Text
+          className="text-2xl font-bold text-center"
+          style={{ color: theme.on }}
+        >
+          ¡Juego completado!
+        </Text>
+        <Text
+          className="text-base mt-1 text-center"
+          style={{ color: withAlpha(theme.on, 0.85) }}
+        >
           {gameName} • {studentName}
         </Text>
       </View>
 
-      <View style={styles.summaryCard}>
-        <Text style={styles.performanceMessage}>{performanceMessage}</Text>
-        <Text style={styles.performanceSubtitle}>
+      <View className="bg-white rounded-3xl p-6 space-y-4 border border-gray-200 shadow">
+        <View
+          className="self-center h-16 w-16 rounded-full items-center justify-center"
+          style={{ backgroundColor: withAlpha(theme.accent, 0.18) }}
+        >
+          <Text className="text-4xl">{performanceIcon}</Text>
+        </View>
+        <Text className="text-2xl font-bold text-center">
+          {performanceMessage}
+        </Text>
+        <Text className="text-base text-gray-600 text-center">
           Has obtenido {results.score} puntos
         </Text>
-        <View style={styles.starRow}>
+        <View className="flex-row justify-center gap-2">
           {Array.from({ length: 3 }).map((_, index) => (
             <Text
               key={index}
-              style={[
-                styles.star,
-                index < starRating ? { color: theme.accent } : styles.starEmpty,
-              ]}
+              className={`${
+                index < starRating ? "text-yellow-400" : "text-gray-300"
+              }`}
+              style={{ fontSize: 28, lineHeight: 32 }}
             >
               ★
             </Text>
           ))}
         </View>
-        <View style={styles.progressBar}>
+        <View className="flex-row justify-between items-center mt-2 mb-1 px-1">
+          <Text className="text-xs font-semibold text-gray-600">Puntuación</Text>
+          <Text className="text-sm font-bold text-gray-900">{results.score}%</Text>
+        </View>
+        <View className="h-3.5 rounded-full bg-gray-200 overflow-hidden">
           <View
-            style={[
-              styles.progressFill,
-              { width: `${results.score}%`, backgroundColor: theme.accent },
-            ]}
+            className="h-full rounded-full"
+            style={{
+              width: `${results.score}%`,
+              backgroundColor: theme.accent,
+            }}
           />
         </View>
       </View>
 
-      <View style={styles.statsGrid}>
+      <View className="flex-row flex-wrap gap-3">
         {stats.map((stat) => (
-          <View key={stat.label} style={styles.statCard}>
-            <Text style={styles.statLabel}>{stat.label}</Text>
-            <Text style={styles.statValue}>{stat.value}</Text>
+          <View
+            key={stat.label}
+            className="basis-[48%] min-w-[48%] bg-white rounded-2xl p-4 border border-gray-200 shadow-sm"
+          >
+            <Text className="text-sm text-gray-500">{stat.label}</Text>
+            <Text className="text-2xl font-bold mt-1 text-gray-900">
+              {stat.value}
+            </Text>
           </View>
-        ))}
-      </View>
+          ))}
+        </View>
 
-      <View style={styles.achievementsCard}>
-        <Text style={styles.sectionTitle}>Logros obtenidos</Text>
+        <View className="bg-white rounded-3xl p-6 border border-gray-200 shadow space-y-4">
+          <View className="flex-row items-center gap-2">
+          <View className="h-9 w-9 rounded-full items-center justify-center bg-yellow-100">
+            <Text className="text-xl">🏅</Text>
+          </View>
+          <Text className="text-lg font-bold text-gray-900">
+            Logros obtenidos
+          </Text>
+        </View>
         {achievements.length === 0 ? (
-          <Text style={styles.noAchievementsText}>
+          <Text className="text-gray-600">
             Sigue practicando para desbloquear logros especiales.
           </Text>
         ) : (
           achievements.map((achievement) => (
             <View
               key={achievement.title}
-              style={[
-                styles.achievementRow,
-                {
-                  backgroundColor: withAlpha(achievement.accent, 0.12),
-                  borderColor: withAlpha(achievement.accent, 0.45),
-                },
-              ]}
+              className="flex-row items-center gap-3 p-3 rounded-xl border"
+              style={{
+                backgroundColor:
+                  achievementPalette[achievement.accent]?.background ??
+                  withAlpha(achievement.accent, 0.12),
+                borderColor:
+                  achievementPalette[achievement.accent]?.border ??
+                  withAlpha(achievement.accent, 0.45),
+              }}
             >
               <View
-                style={[
-                  styles.achievementBadge,
-                  { backgroundColor: achievement.accent },
-                ]}
-              />
-              <View style={styles.achievementTextGroup}>
-                <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                <Text style={styles.achievementDescription}>
+                className="h-10 w-10 rounded-full items-center justify-center"
+                style={{
+                  backgroundColor: withAlpha(achievement.accent, 0.18),
+                }}
+              >
+                <Text style={{ fontSize: 20 }}>{achievement.icon}</Text>
+              </View>
+              <View className="flex-1">
+                <Text className="font-semibold text-gray-900">
+                  {achievement.title}
+                </Text>
+                <Text className="text-sm text-gray-600">
                   {achievement.description}
                 </Text>
               </View>
@@ -179,199 +235,43 @@ export default function StudentResults({
         )}
       </View>
 
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.primaryButton} onPress={onPlayAgain}>
-          <Text style={styles.primaryButtonText}>Jugar nuevamente</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={onBackToHome}>
-          <Text style={styles.secondaryButtonText}>Volver al inicio</Text>
-        </TouchableOpacity>
+      <View className="bg-blue-50 border border-gray-200 rounded-2xl p-5 space-y-2">
+        <Text className="text-lg font-bold text-center text-gray-900">
+          ¡Sigue aprendiendo!
+        </Text>
+        <Text className="text-sm text-center text-gray-600">
+          {results.score >= 80
+            ? "¡Excelente trabajo! Estás dominando muy bien este juego. ¿Te animas a probar otro?"
+            : "¡Muy bien! Cada vez que juegas, aprendes algo nuevo. ¡Sigue practicando para mejorar aún más!"}
+        </Text>
+      </View>
+
+      <View className="flex-row gap-3">
+        <NunitoButton
+          style={{ flex: 1, padding: 0, backgroundColor: "transparent" }}
+          contentStyle={{ minHeight: 48, borderRadius: 12, backgroundColor: theme.accent }}
+          onPress={onPlayAgain}
+        >
+          <Text className="text-lg font-bold text-center" style={{ color: theme.on }}>
+            ⭐ Jugar de nuevo
+          </Text>
+        </NunitoButton>
+        <NunitoButton
+          style={{ flex: 1, padding: 0, backgroundColor: "transparent" }}
+          contentStyle={{
+            minHeight: 48,
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: theme.accent,
+            backgroundColor: "#fff",
+          }}
+          onPress={onBackToHome}
+        >
+          <Text className="text-lg font-bold text-center" style={{ color: theme.accent }}>
+            🏠 Volver al inicio
+          </Text>
+        </NunitoButton>
       </View>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: palette.background,
-  },
-  content: {
-    padding: 24,
-    paddingBottom: 40,
-    gap: 20,
-  },
-  heroCard: {
-    borderRadius: 24,
-    padding: 28,
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: palette.primaryOn,
-  },
-  heroSubtitle: {
-    marginTop: 6,
-    color: withAlpha(palette.primaryOn, 0.85),
-    fontSize: 15,
-  },
-  summaryCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 24,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000012",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  performanceMessage: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  performanceSubtitle: {
-    fontSize: 15,
-    color: palette.muted,
-  },
-  starRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  star: {
-    fontSize: 22,
-  },
-  starEmpty: {
-    color: withAlpha(palette.muted, 0.4),
-  },
-  progressBar: {
-    height: 12,
-    backgroundColor: palette.surfaceMuted,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  statCard: {
-    flexBasis: "48%",
-    minWidth: "48%",
-    backgroundColor: palette.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
-    flexGrow: 1,
-    shadowColor: "#0000000d",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: palette.muted,
-  },
-  statValue: {
-    marginTop: 6,
-    fontSize: 20,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  achievementsCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 24,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000012",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  noAchievementsText: {
-    color: palette.muted,
-    fontSize: 14,
-  },
-  achievementRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  achievementBadge: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  achievementTextGroup: {
-    flex: 1,
-    gap: 2,
-  },
-  achievementTitle: {
-    fontWeight: "700",
-    color: palette.text,
-  },
-  achievementDescription: {
-    color: palette.muted,
-    fontSize: 13,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: palette.primary,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  primaryButtonText: {
-    color: palette.primaryOn,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  secondaryButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: palette.primary,
-    alignItems: "center",
-    backgroundColor: withAlpha(palette.primary, 0.05),
-  },
-  secondaryButtonText: {
-    color: palette.primary,
-    fontWeight: "600",
-    fontSize: 16,
-  },
-});

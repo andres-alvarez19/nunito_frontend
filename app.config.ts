@@ -26,6 +26,7 @@ export default (): ExpoConfig => ({
     predictiveBackGestureEnabled: false,
   },
   web: {
+    bundler: 'metro',
     favicon: './assets/favicon.png',
   },
 });

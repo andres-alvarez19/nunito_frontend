@@ -1,7 +1,8 @@
-import HomeScreen from '@/features/home/screens/HomeScreen';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-export default function Index() {
+import HomeScreen from "../src/features/home/screens/HomeScreen";
+
+export default function App() {
   return (
     <SafeAreaProvider>
       <HomeScreen />

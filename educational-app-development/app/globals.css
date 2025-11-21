@@ -1,0 +1,198 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Updated color system to match PIE educational app design with green/teal palette from provided CSS */
+:root {
+  /* PIE Educational App Color System - Based on provided CSS */
+  --background: #f4fbf8; /* Light mint background */
+  --foreground: #161d1c; /* Dark text */
+  --card: #ffffff; /* White cards */
+  --card-foreground: #161d1c; /* Dark text on cards */
+  --popover: #ffffff; /* White popovers */
+  --popover-foreground: #161d1c; /* Dark text on popovers */
+  --primary: #006a61; /* Main teal primary color */
+  --primary-foreground: #ffffff; /* White text on primary */
+  --secondary: #4a635f; /* Secondary teal-gray */
+  --secondary-foreground: #ffffff; /* White text on secondary */
+  --muted: #dae5e2; /* Muted surface variant */
+  --muted-foreground: #3f4947; /* Muted text */
+  --accent: #82d5ca; /* Light teal accent */
+  --accent-foreground: #005049; /* Dark text on accent */
+  --destructive: #ba1a1a; /* Error red */
+  --destructive-foreground: #ffffff; /* White text on error */
+  --border: #bec9c6; /* Border color */
+  --input: #ffffff; /* Input background */
+  --ring: #006a61; /* Focus ring - primary color */
+
+  /* Game-specific colors from provided CSS */
+  --mint-color: #38693c;
+  --mint-on-color: #ffffff;
+  --mint-color-container: #b9f0b8;
+  --pastel-color: #745b0c;
+  --pastel-on-color: #ffffff;
+  --pastel-color-container: #ffdf90;
+  --violet-color: #615690;
+  --violet-on-color: #ffffff;
+  --violet-color-container: #e6deff;
+  --rose-color: #8c4a60;
+  --rose-on-color: #ffffff;
+  --rose-color-container: #ffd9e2;
+  --blue-color: #415f91;
+  --blue-on-color: #ffffff;
+  --blue-color-container: #d6e3ff;
+
+  --radius: 0.75rem; /* Rounded corners for child-friendly design */
+  --sidebar: #f4fbf8;
+  --sidebar-foreground: #161d1c;
+  --sidebar-primary: #006a61;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #82d5ca;
+  --sidebar-accent-foreground: #005049;
+  --sidebar-border: #bec9c6;
+  --sidebar-ring: #006a61;
+}
+
+.dark {
+  --background: #2b3230;
+  --foreground: #ecf2f0;
+  --card: #2b3230;
+  --card-foreground: #ecf2f0;
+  --popover: #2b3230;
+  --popover-foreground: #ecf2f0;
+  --primary: #82d5ca;
+  --primary-foreground: #005049;
+  --secondary: #b1ccc7;
+  --secondary-foreground: #324b48;
+  --muted: #3f4947;
+  --muted-foreground: #bec9c6;
+  --accent: #82d5ca;
+  --accent-foreground: #005049;
+  --destructive: #ffdad6;
+  --destructive-foreground: #93000a;
+  --border: #3f4947;
+  --input: #3f4947;
+  --ring: #82d5ca;
+  --sidebar: #2b3230;
+  --sidebar-foreground: #ecf2f0;
+  --sidebar-primary: #82d5ca;
+  --sidebar-primary-foreground: #005049;
+  --sidebar-accent: #b1ccc7;
+  --sidebar-accent-foreground: #324b48;
+  --sidebar-border: #3f4947;
+  --sidebar-ring: #82d5ca;
+}
+
+@theme inline {
+  /* Updated font variables to use Inter and Fredoka */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--mint-color);
+  --color-chart-2: var(--pastel-color);
+  --color-chart-3: var(--violet-color);
+  --color-chart-4: var(--rose-color);
+  --color-chart-5: var(--blue-color);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  /* Added font-display utility for headings */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+  }
+}
+
+/* Added custom utility classes for game-specific colors */
+@layer utilities {
+  .bg-mint {
+    background-color: var(--mint-color);
+  }
+  .text-mint-on {
+    color: var(--mint-on-color);
+  }
+  .bg-mint-container {
+    background-color: var(--mint-color-container);
+  }
+
+  .bg-pastel {
+    background-color: var(--pastel-color);
+  }
+  .text-pastel-on {
+    color: var(--pastel-on-color);
+  }
+  .bg-pastel-container {
+    background-color: var(--pastel-color-container);
+  }
+
+  .bg-violet {
+    background-color: var(--violet-color);
+  }
+  .text-violet-on {
+    color: var(--violet-on-color);
+  }
+  .bg-violet-container {
+    background-color: var(--violet-color-container);
+  }
+
+  .bg-rose {
+    background-color: var(--rose-color);
+  }
+  .text-rose-on {
+    color: var(--rose-on-color);
+  }
+  .bg-rose-container {
+    background-color: var(--rose-color-container);
+  }
+
+  .bg-blue {
+    background-color: var(--blue-color);
+  }
+  .text-blue-on {
+    color: var(--blue-on-color);
+  }
+  .bg-blue-container {
+    background-color: var(--blue-color-container);
+  }
+}

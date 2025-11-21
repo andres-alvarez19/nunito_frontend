@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Platform, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
+import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 import { formatSeconds } from "@/utils/time";
 
@@ -16,256 +11,6 @@ interface StudentDashboardProps {
   onStartGame: (gameId: string) => void;
   onLeaveRoom: () => void;
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    backgroundColor: palette.background,
-  },
-  content: {
-    padding: 24,
-    paddingBottom: 40,
-    gap: 20,
-  },
-  headerCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000012",
-    shadowOpacity: 0.14,
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: palette.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: palette.primaryOn,
-    fontWeight: "700",
-    fontSize: 22,
-  },
-  headerInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  roomCodeLabel: {
-    fontSize: 14,
-    color: palette.muted,
-  },
-  leaveButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: withAlpha(palette.error, 0.5),
-    backgroundColor: withAlpha(palette.error, 0.12),
-  },
-  leaveButtonText: {
-    color: palette.error,
-    fontWeight: "600",
-  },
-  waitingCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 24,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000012",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  sectionSubtitle: {
-    fontSize: 15,
-    color: palette.muted,
-  },
-  studentCountBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: withAlpha(palette.primary, 0.12),
-  },
-  studentCountText: {
-    color: palette.primary,
-    fontWeight: "600",
-  },
-  studentGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  studentChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: withAlpha(palette.primary, 0.05),
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    flexGrow: 1,
-    minWidth: "45%",
-    borderWidth: 1,
-    borderColor: withAlpha(palette.primary, 0.15),
-  },
-  studentChipCurrent: {
-    borderColor: palette.primary,
-    backgroundColor: withAlpha(palette.primary, 0.18),
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#22C55E",
-  },
-  studentChipText: {
-    color: palette.text,
-    fontWeight: "500",
-  },
-  studentChipTextCurrent: {
-    fontWeight: "700",
-  },
-  gameCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 24,
-    gap: 16,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000012",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  timerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  timerLabel: {
-    fontSize: 14,
-    color: palette.muted,
-  },
-  timerValue: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: palette.primary,
-  },
-  progressBar: {
-    height: 10,
-    backgroundColor: withAlpha(palette.primary, 0.08),
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: palette.primary,
-    borderRadius: 999,
-  },
-  primaryButton: {
-    backgroundColor: palette.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  primaryButtonText: {
-    color: palette.primaryOn,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  motivationGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  motivationCard: {
-    flexBasis: "31%",
-    minWidth: "31%",
-    backgroundColor: palette.surfaceMuted,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: withAlpha(palette.border, 0.8),
-    flexGrow: 1,
-  },
-  motivationTitle: {
-    fontWeight: "700",
-    color: palette.text,
-    marginBottom: 6,
-  },
-  motivationDescription: {
-    color: palette.muted,
-    fontSize: 13,
-  },
-  instructionsCard: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 24,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000012",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  instructionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  instructionBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: withAlpha(palette.primary, 0.14),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  instructionBadgeText: {
-    color: palette.primary,
-    fontWeight: "700",
-  },
-  instructionText: {
-    flex: 1,
-    color: palette.text,
-  },
-});
 
 const connectedStudentsMock = ["Ana", "Carlos", "María"];
 
@@ -343,51 +88,96 @@ export default function StudentDashboard({
     onStartGame("image-word");
   };
 
+  const cardSpacing = Platform.OS === "web" ? "space-y-5" : "space-y-4";
+
   return (
-    <ScrollView style={styles.wrapper} contentContainerStyle={styles.content}>
-      <View style={styles.headerCard}>
-        <View style={styles.headerRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{avatarInitial}</Text>
+    <ScrollView
+      className="flex-1"
+      style={{ backgroundColor: palette.background }}
+      contentContainerClassName={`px-6 pb-10 pt-6 ${cardSpacing}`}
+    >
+      <View
+        className="rounded-3xl border p-5 shadow-sm"
+        style={{ backgroundColor: palette.surface, borderColor: palette.border }}
+      >
+        <View className="flex-row items-center gap-4">
+          <View
+            className="h-14 w-14 rounded-full items-center justify-center"
+            style={{ backgroundColor: palette.primary }}
+          >
+            <Text className="text-2xl font-bold" style={{ color: palette.primaryOn }}>
+              {avatarInitial}
+            </Text>
           </View>
-          <View style={styles.headerInfo}>
-            <Text style={styles.greeting}>¡Hola, {studentName}!</Text>
-            <Text style={styles.roomCodeLabel}>Sala {roomCode}</Text>
+          <View className="flex-1 gap-1">
+            <Text className="text-2xl font-bold" style={{ color: palette.text }}>
+              ¡Hola, {studentName}!
+            </Text>
+            <Text className="text-sm" style={{ color: palette.muted }}>
+              Sala {roomCode}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.leaveButton} onPress={onLeaveRoom}>
-            <Text style={styles.leaveButtonText}>Salir</Text>
+          <TouchableOpacity
+            className="px-3 py-2 rounded-xl border"
+            style={{
+              borderColor: withAlpha(palette.error, 0.5),
+              backgroundColor: withAlpha(palette.error, 0.12),
+            }}
+            onPress={onLeaveRoom}
+          >
+            <Text className="font-semibold" style={{ color: palette.error }}>
+              Salir
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {isWaiting ? (
-        <View style={styles.waitingCard}>
-          <Text style={styles.sectionTitle}>
+        <View
+          className="rounded-3xl border p-6 space-y-4 shadow"
+          style={{ backgroundColor: palette.surface, borderColor: palette.border }}
+        >
+          <Text className="text-xl font-bold" style={{ color: palette.text }}>
             Esperando que inicie el juego…
           </Text>
-          <Text style={styles.sectionSubtitle}>
+          <Text className="text-base" style={{ color: palette.muted }}>
             Tu profesor iniciará la actividad pronto.
           </Text>
-          <View style={styles.studentCountBadge}>
-            <Text style={styles.studentCountText}>
+          <View
+            className="self-start rounded-full px-3 py-1.5"
+            style={{ backgroundColor: withAlpha(palette.primary, 0.12) }}
+          >
+            <Text className="font-semibold" style={{ color: palette.primary }}>
               Estudiantes conectados: {totalStudents}
             </Text>
           </View>
-          <View style={styles.studentGrid}>
+          <View className="flex-row flex-wrap gap-3">
             {studentList.map((student) => (
               <View
                 key={student}
-                style={[
-                  styles.studentChip,
-                  student === studentName && styles.studentChipCurrent,
-                ]}
+                className="flex-row items-center gap-2 rounded-xl px-3.5 py-2.5 border flex-1"
+                style={{
+                  minWidth: "45%",
+                  borderColor: withAlpha(
+                    palette.primary,
+                    student === studentName ? 0.4 : 0.15,
+                  ),
+                  backgroundColor: withAlpha(
+                    palette.primary,
+                    student === studentName ? 0.18 : 0.05,
+                  ),
+                }}
               >
-                <View style={styles.statusDot} />
+                <View
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: "#22C55E" }}
+                />
                 <Text
-                  style={[
-                    styles.studentChipText,
-                    student === studentName && styles.studentChipTextCurrent,
-                  ]}
+                  className="text-base"
+                  style={{
+                    color: palette.text,
+                    fontWeight: student === studentName ? "700" : "500",
+                  }}
                 >
                   {student}
                 </Text>
@@ -396,41 +186,60 @@ export default function StudentDashboard({
           </View>
         </View>
       ) : (
-        <View style={styles.gameCard}>
-          <Text style={styles.sectionTitle}>La actividad ha comenzado</Text>
-          <Text style={styles.sectionSubtitle}>
+        <View
+          className="rounded-3xl border p-6 space-y-4 shadow"
+          style={{ backgroundColor: palette.surface, borderColor: palette.border }}
+        >
+          <Text className="text-xl font-bold" style={{ color: palette.text }}>
+            La actividad ha comenzado
+          </Text>
+          <Text className="text-base" style={{ color: palette.muted }}>
             Presiona el botón cuando estés listo para jugar.
           </Text>
 
-          <View style={styles.timerRow}>
-            <Text style={styles.timerLabel}>Tiempo restante</Text>
-            <Text style={styles.timerValue}>{formattedTime}</Text>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-sm" style={{ color: palette.muted }}>
+              Tiempo restante
+            </Text>
+            <Text className="text-xl font-bold" style={{ color: palette.primary }}>
+              {formattedTime}
+            </Text>
           </View>
 
-          <View style={styles.progressBar}>
+          <View
+            className="h-2.5 rounded-full overflow-hidden"
+            style={{ backgroundColor: withAlpha(palette.primary, 0.08) }}
+          >
             <View
-              style={[
-                styles.progressFill,
-                { width: `${Math.min(Math.max(progress, 0), 100)}%` },
-              ]}
+              className="h-full rounded-full"
+              style={{
+                backgroundColor: palette.primary,
+                width: `${Math.min(Math.max(progress, 0), 100)}%`,
+              }}
             />
           </View>
 
-          <TouchableOpacity
-            style={[styles.primaryButton, !isActive && styles.disabledButton]}
-            onPress={handlePlay}
-            disabled={!isActive}
-          >
-            <Text style={styles.primaryButtonText}>
+          <NunitoButton disabled={!isActive} onPress={handlePlay}>
+            <Text className="text-lg font-bold" style={{ color: palette.text }}>
               {isActive ? "¡Comenzar a jugar!" : "Esperando instrucciones…"}
             </Text>
-          </TouchableOpacity>
+          </NunitoButton>
 
-          <View style={styles.motivationGrid}>
+          <View className="flex-row flex-wrap gap-3">
             {MOTIVATION_CARDS.map((card) => (
-              <View key={card.title} style={styles.motivationCard}>
-                <Text style={styles.motivationTitle}>{card.title}</Text>
-                <Text style={styles.motivationDescription}>
+              <View
+                key={card.title}
+                className="flex-1 rounded-xl border px-3.5 py-3"
+                style={{
+                  minWidth: "45%",
+                  backgroundColor: palette.surfaceMuted,
+                  borderColor: withAlpha(palette.border, 0.8),
+                }}
+              >
+                <Text className="font-bold mb-1" style={{ color: palette.text }}>
+                  {card.title}
+                </Text>
+                <Text className="text-sm" style={{ color: palette.muted }}>
                   {card.description}
                 </Text>
               </View>
@@ -439,14 +248,26 @@ export default function StudentDashboard({
         </View>
       )}
 
-      <View style={styles.instructionsCard}>
-        <Text style={styles.sectionTitle}>Instrucciones del juego</Text>
+      <View
+        className="rounded-3xl border p-6 space-y-3 shadow"
+        style={{ backgroundColor: palette.surface, borderColor: palette.border }}
+      >
+        <Text className="text-xl font-bold" style={{ color: palette.text }}>
+          Instrucciones del juego
+        </Text>
         {GAME_INSTRUCTIONS.map((step, index) => (
-          <View key={step} style={styles.instructionRow}>
-            <View style={styles.instructionBadge}>
-              <Text style={styles.instructionBadgeText}>{index + 1}</Text>
+          <View key={step} className="flex-row items-center gap-3">
+            <View
+              className="h-7 w-7 rounded-full items-center justify-center"
+              style={{ backgroundColor: withAlpha(palette.primary, 0.14) }}
+            >
+              <Text className="font-bold" style={{ color: palette.primary }}>
+                {index + 1}
+              </Text>
             </View>
-            <Text style={styles.instructionText}>{step}</Text>
+            <Text className="flex-1 text-base" style={{ color: palette.text }}>
+              {step}
+            </Text>
           </View>
         ))}
       </View>

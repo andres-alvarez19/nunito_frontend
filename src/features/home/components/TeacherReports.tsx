@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 import { gameDefinitions } from "@/features/home/constants/games";
+import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 
 interface TeacherReportsProps {
@@ -223,15 +224,20 @@ export default function TeacherReports({
         </View>
 
         <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => setSelectedReport(null)}
+          <NunitoButton
+            style={styles.actionButton}
+            contentStyle={styles.secondaryButton}
           >
-            <Text style={styles.secondaryButtonText}>Volver a reportes</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryButton} onPress={onBack}>
+            <TouchableOpacity
+              onPress={() => setSelectedReport(null)}
+              style={styles.secondaryButtonInner}
+            >
+              <Text style={styles.secondaryButtonText}>Volver a reportes</Text>
+            </TouchableOpacity>
+          </NunitoButton>
+          <NunitoButton style={styles.actionButton} onPress={onBack}>
             <Text style={styles.primaryButtonText}>Volver al menú</Text>
-          </TouchableOpacity>
+          </NunitoButton>
         </View>
       </ScrollView>
     );
@@ -470,31 +476,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
   },
-  primaryButton: {
+  actionButton: {
     flex: 1,
-    backgroundColor: palette.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
+  },
+  primaryButton: {
   },
   primaryButtonText: {
-    color: palette.primaryOn,
+    color: palette.text,
     fontWeight: "700",
     fontSize: 16,
   },
   secondaryButton: {
-    flex: 1,
     paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.primary,
-    alignItems: "center",
     backgroundColor: withAlpha(palette.primary, 0.05),
+  },
+  secondaryButtonInner: {
+    alignItems: "center",
   },
   secondaryButtonText: {
     color: palette.primary,

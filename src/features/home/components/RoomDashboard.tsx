@@ -11,6 +11,7 @@ import {
   gameDefinitions,
   gameThemeTokens,
 } from "@/features/home/constants/games";
+import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 import type { Room } from "@/features/home/types";
 import { formatSeconds } from "@/utils/time";
@@ -152,16 +153,13 @@ export default function RoomDashboard({
 
         <View style={styles.controlRow}>
           {!room.isActive ? (
-            <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                room.students.length === 0 && styles.disabledButton,
-              ]}
+            <NunitoButton
+              style={room.students.length === 0 && styles.disabledButton}
               disabled={room.students.length === 0}
               onPress={handleStartPress}
             >
               <Text style={styles.primaryButtonText}>Iniciar juego</Text>
-            </TouchableOpacity>
+            </NunitoButton>
           ) : (
             <TouchableOpacity
               style={styles.destructiveButton}
@@ -171,12 +169,14 @@ export default function RoomDashboard({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={onViewResults}
-          >
-            <Text style={styles.secondaryButtonText}>Ver reportes</Text>
-          </TouchableOpacity>
+          <NunitoButton contentStyle={styles.secondaryButton}>
+            <TouchableOpacity
+              style={styles.secondaryButtonInner}
+              onPress={onViewResults}
+            >
+              <Text style={styles.secondaryButtonText}>Ver reportes</Text>
+            </TouchableOpacity>
+          </NunitoButton>
         </View>
       </View>
 
@@ -363,19 +363,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryButton: {
-    flex: 1,
-    backgroundColor: palette.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
   },
   primaryButtonText: {
-    color: palette.primaryOn,
+    color: palette.text,
     fontWeight: "700",
     fontSize: 16,
   },
@@ -398,12 +388,14 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: palette.primary,
-    alignItems: "center",
     paddingVertical: 14,
     backgroundColor: withAlpha(palette.primary, 0.05),
+  },
+  secondaryButtonInner: {
+    alignItems: "center",
   },
   secondaryButtonText: {
     color: palette.primary,

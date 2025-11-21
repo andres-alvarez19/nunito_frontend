@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
-import { palette } from '@/theme/colors';
+import { palette, withAlpha } from '@/theme/colors';
 import { formatSeconds } from '@/utils/time';
 
 import type { GameComponentProps } from './types';
@@ -44,6 +44,14 @@ interface StatsState {
 }
 
 export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGameComplete }: GameComponentProps) {
+  const theme = useMemo(
+    () => ({
+      container: palette.pastelContainer,
+      accent: palette.pastel,
+      onAccent: palette.pastelOn,
+    }),
+    []
+  );
   const questions = useMemo(() => questionBank[difficulty] ?? questionBank.easy, [difficulty]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -53,7 +61,7 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const questionStartRef = useRef(Date.now());
-  const [, setStats] = useState<StatsState>({
+  const [stats, setStats] = useState<StatsState>({
     correct: 0,
     incorrect: 0,
     responses: [],
@@ -64,6 +72,8 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
   const currentQuestion = questions[questionIndex];
   const totalQuestions = questions.length;
   const progress = ((questionIndex + 1) / totalQuestions) * 100;
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 900;
 
   useEffect(() => {
     questionStartRef.current = Date.now();
@@ -157,92 +167,159 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.wrapper}>
+    <ScrollView contentContainerStyle={[styles.wrapper, { backgroundColor: theme.container }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onExit} style={styles.backButton} accessibilityRole="button">
-          <Text style={styles.backText}>← Salir</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>← Salir</Text>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.timerLabel}>Tiempo restante</Text>
-          <Text style={styles.timerValue}>{formatSeconds(timeRemaining)}</Text>
+          <Text style={[styles.timerValue, { color: theme.accent }]}>{formatSeconds(timeRemaining)}</Text>
         </View>
       </View>
 
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progress}%` }]} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.questionCounter}>
-          Palabra {questionIndex + 1} de {totalQuestions}
-        </Text>
-        <Text style={styles.word}>{currentQuestion.word}</Text>
-        <Text style={styles.prompt}>¿Cuántas sílabas tiene esta palabra?</Text>
-
-        <View style={styles.optionRow}>
-          {currentQuestion.options.map((option) => {
-            const isSelected = selectedAnswer === option;
-            const isCorrect = showFeedback && option === currentQuestion.correctCount;
-            const isIncorrectChoice = showFeedback && isSelected && !isCorrect;
-
-            return (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.chip,
-                  isSelected && styles.chipSelected,
-                  isCorrect && styles.chipCorrect,
-                  isIncorrectChoice && styles.chipIncorrect,
-                ]}
-                onPress={() => handleAnswerPress(option)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.chipText}>{option}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <TouchableOpacity style={styles.hintButton} onPress={() => setShowSyllables((prev) => !prev)}>
-          <Text style={styles.hintText}>{showSyllables ? 'Ocultar sílabas' : 'Mostrar sílabas'}</Text>
-        </TouchableOpacity>
-
-        {showSyllables && (
-          <View style={styles.syllableGroup}>
-            {currentQuestion.syllables.map((syllable) => (
-              <View key={syllable} style={styles.syllableChip}>
-                <Text style={styles.syllableText}>{syllable}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {showFeedback && (
-          <View
-            style={[styles.feedback, answerWasCorrect ? styles.feedbackSuccess : styles.feedbackError]}
-          >
-            <Text style={styles.feedbackText}>
-              {answerWasCorrect
-                ? '¡Muy bien! Contaste correctamente las sílabas.'
-                : 'Recuerda separar la palabra en golpes de voz y vuelve a intentarlo.'}
+      <View style={[styles.metaCard, { backgroundColor: theme.accent }]}>
+        <View style={styles.metaTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.metaTitle, { color: theme.onAccent }]}>Conteo de Sílabas</Text>
+            <Text style={[styles.metaSubtitle, { color: withAlpha(theme.onAccent, 0.85) }]}>
+              Pregunta {questionIndex + 1} de {totalQuestions}
             </Text>
           </View>
-        )}
-
-        {showFeedback && questionIndex < totalQuestions - 1 && (
-          <TouchableOpacity style={styles.nextButton} onPress={handleNextQuestion} accessibilityRole="button">
-            <Text style={styles.nextButtonText}>Siguiente palabra</Text>
-          </TouchableOpacity>
-        )}
+          <View style={styles.metaBadges}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{formatSeconds(timeRemaining)}</Text>
+            </View>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {stats.correct}/{totalQuestions}
+              </Text>
+            </View>
+            {stats.streak > 0 && (
+              <View style={[styles.badge, styles.streakBadge]}>
+                <Text style={[styles.badgeText, styles.streakText]}>🔥 {stats.streak}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <View style={[styles.metaProgress, { backgroundColor: withAlpha(theme.onAccent, 0.25) }]}>
+          <View style={[styles.metaProgressFill, { width: `${progress}%` }]} />
+        </View>
       </View>
+
+      <View style={[styles.columns, { flexDirection: isWideLayout ? 'row' : 'column' }]}>
+        <View style={[styles.card, styles.columnCard, { borderColor: withAlpha(theme.accent, 0.2) }]}>
+          <Text style={styles.sectionTitle}>¿Cuántas sílabas tiene esta palabra?</Text>
+          <View style={[styles.wordContainer, { backgroundColor: theme.accent }]}>
+            <Text style={[styles.word, { color: theme.onAccent }]}>{currentQuestion.word}</Text>
+          </View>
+          <Text style={styles.prompt}>Separa mentalmente la palabra y cuenta cada sonido.</Text>
+
+          <TouchableOpacity style={styles.hintButton} onPress={() => setShowSyllables((prev) => !prev)}>
+            <Text style={[styles.hintText, { color: theme.accent }]}>
+              {showSyllables ? 'Ocultar sílabas' : '💡 Ver división silábica'}
+            </Text>
+          </TouchableOpacity>
+
+          {showSyllables && (
+            <View style={styles.syllableGroup}>
+              {currentQuestion.syllables.map((syllable) => (
+                <View
+                  key={syllable}
+                  style={[
+                    styles.syllableChip,
+                    { borderColor: theme.accent, backgroundColor: withAlpha(theme.accent, 0.18) },
+                  ]}
+                >
+                  <Text style={[styles.syllableText, { color: theme.accent }]}>{syllable}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.card, styles.columnCard, { borderColor: withAlpha(theme.accent, 0.2) }]}>
+          <Text style={styles.sectionTitle}>Selecciona el número de sílabas</Text>
+          <Text style={styles.sectionSubtitle}>Toca la opción correcta para avanzar</Text>
+
+          <View style={styles.optionRow}>
+            {currentQuestion.options.map((option) => {
+              const isSelected = selectedAnswer === option;
+              const isCorrect = showFeedback && option === currentQuestion.correctCount;
+              const isIncorrectChoice = showFeedback && isSelected && !isCorrect;
+
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: withAlpha(theme.accent, 0.18), borderColor: withAlpha(theme.accent, 0.35) },
+                    isSelected && { backgroundColor: withAlpha(theme.accent, 0.3), borderColor: theme.accent },
+                    isCorrect && styles.chipCorrect,
+                    isIncorrectChoice && styles.chipIncorrect,
+                  ]}
+                  onPress={() => handleAnswerPress(option)}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      (isSelected || isCorrect || isIncorrectChoice) && styles.chipTextActive,
+                    ]}
+                  >
+                    {option} {option === 1 ? 'sílaba' : 'sílabas'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+
+      {showFeedback && (
+        <View
+          style={[
+            styles.feedback,
+            answerWasCorrect ? styles.feedbackSuccess : styles.feedbackError,
+            { borderColor: answerWasCorrect ? '#22c55e' : '#f87171' },
+          ]}
+        >
+          <Text style={styles.feedbackTitle}>{answerWasCorrect ? '✅ Correcto' : '❌ Incorrecto'}</Text>
+          <Text style={styles.feedbackText}>
+            {answerWasCorrect
+              ? stats.streak >= 3
+                ? `¡INCREÍBLE RACHA! Llevas ${stats.streak} respuestas correctas.`
+                : '¡Muy bien! Contaste correctamente las sílabas.'
+              : `La palabra tiene ${currentQuestion.correctCount} ${
+                  currentQuestion.correctCount === 1 ? 'sílaba' : 'sílabas'
+                }.`}
+          </Text>
+          {showSyllables && (
+            <Text style={styles.feedbackTextMuted}>
+              División silábica: {currentQuestion.syllables.join(' - ')}
+            </Text>
+          )}
+          {questionIndex < totalQuestions - 1 && (
+            <TouchableOpacity style={[styles.nextButton, { backgroundColor: theme.accent }]} onPress={handleNextQuestion} accessibilityRole="button">
+              <Text style={[styles.nextButtonText, { color: theme.onAccent }]}>Siguiente pregunta</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {stats.streak >= 3 && (
+        <View style={styles.celebration}>
+          <Text style={styles.celebrationText}>🎉</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    padding: 24,
-    gap: 24,
+    padding: 20,
+    gap: 18,
     backgroundColor: palette.background,
   },
   header: {
@@ -270,40 +347,103 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: palette.text,
   },
-  progressBar: {
+  metaCard: {
+    borderRadius: 18,
+    padding: 16,
+    gap: 10,
+    shadowColor: '#00000022',
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  metaTop: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  metaTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  metaSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  metaBadges: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  metaProgress: {
     height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E5E7EB',
+    borderRadius: 999,
     overflow: 'hidden',
   },
-  progressFill: {
+  metaProgressFill: {
     height: '100%',
-    backgroundColor: palette.primary,
+    borderRadius: 999,
+    backgroundColor: '#2D6943',
   },
   card: {
     backgroundColor: palette.surface,
+    borderWidth: 1,
     borderRadius: 20,
-    padding: 20,
-    gap: 16,
+    padding: 18,
+    gap: 14,
     shadowColor: '#00000022',
     shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 12,
     elevation: 2,
   },
-  questionCounter: {
-    fontSize: 14,
+  columns: {
+    gap: 14,
+  },
+  columnCard: {
+    flex: 1,
+  },
+  badge: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: '#38693C',
+  },
+  badgeText: {
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  streakBadge: {
+    backgroundColor: '#facc15',
+  },
+  streakText: {
+    color: '#854d0e',
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.text,
+    textAlign: 'center',
+  },
+  sectionSubtitle: {
     color: palette.muted,
+    textAlign: 'center',
+  },
+  wordContainer: {
+    alignSelf: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 20,
   },
   word: {
     fontSize: 40,
     fontWeight: '800',
     color: palette.text,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   prompt: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
     color: palette.text,
     textAlign: 'center',
   },
@@ -314,25 +454,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   chip: {
-    minWidth: 56,
+    minWidth: 68,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 28,
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
-  },
-  chipSelected: {
-    backgroundColor: '#DBEAFE',
+    borderWidth: 1,
   },
   chipCorrect: {
     backgroundColor: '#DCFCE7',
+    borderColor: '#16a34a',
   },
   chipIncorrect: {
     backgroundColor: '#FEE2E2',
+    borderColor: '#f87171',
   },
   chipText: {
     fontSize: 18,
     fontWeight: '700',
+    color: palette.text,
+    textAlign: 'center',
+  },
+  chipTextActive: {
     color: palette.text,
   },
   hintButton: {
@@ -353,6 +497,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     backgroundColor: '#FEF3C7',
+    borderWidth: 1,
   },
   syllableText: {
     color: '#92400E',
@@ -362,6 +507,14 @@ const styles = StyleSheet.create({
   feedback: {
     borderRadius: 12,
     padding: 14,
+    borderWidth: 1,
+    gap: 8,
+  },
+  feedbackTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: palette.text,
   },
   feedbackSuccess: {
     backgroundColor: '#DCFCE7',
@@ -374,15 +527,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  feedbackTextMuted: {
+    color: palette.muted,
+    textAlign: 'center',
+    marginTop: 4,
+  },
   nextButton: {
     marginTop: 4,
-    backgroundColor: palette.primary,
+    backgroundColor: palette.pastel,
     paddingVertical: 14,
     borderRadius: 12,
   },
   nextButtonText: {
-    color: palette.primaryOn,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  celebration: {
+    position: 'absolute',
+    bottom: 32,
+    right: 24,
+    backgroundColor: withAlpha(palette.pastel, 0.15),
+    borderRadius: 999,
+    padding: 16,
+  },
+  celebrationText: {
+    fontSize: 28,
   },
 });

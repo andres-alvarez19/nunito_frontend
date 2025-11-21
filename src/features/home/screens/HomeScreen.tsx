@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BackHandler,
   Image,
+  Platform,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -30,6 +31,8 @@ import type {
   Teacher,
 } from "@/features/home/types";
 import { palette, withAlpha } from "@/theme/colors";
+import NunitoButton from "@/features/home/components/NunitoButton";
+import WebLayout from "@/features/home/components/WebLayout";
 
 const HOME_TABS = {
   student: "student" as const,
@@ -49,22 +52,22 @@ const FEATURE_ITEMS: Array<{
   description: string;
   icon: FeatherIconName;
 }> = [
-  {
-    title: "Retroalimentación inmediata",
-    description: "Recibe respuestas al instante para mejorar.",
-    icon: "zap",
-  },
-  {
-    title: "Salas virtuales",
-    description: "Los profesores pueden crear y gestionar sesiones.",
-    icon: "users",
-  },
-  {
-    title: "Reportes detallados",
-    description: "Consulta el progreso individual y grupal.",
-    icon: "bar-chart-2",
-  },
-];
+    {
+      title: "Retroalimentación inmediata",
+      description: "Recibe respuestas al instante para mejorar.",
+      icon: "zap",
+    },
+    {
+      title: "Salas virtuales",
+      description: "Los profesores pueden crear y gestionar sesiones.",
+      icon: "users",
+    },
+    {
+      title: "Reportes detallados",
+      description: "Consulta el progreso individual y grupal.",
+      icon: "bar-chart-2",
+    },
+  ];
 
 const GAME_ICON_MAP: Record<string, FeatherIconName> = {
   "image-word": "image",
@@ -75,6 +78,7 @@ const GAME_ICON_MAP: Record<string, FeatherIconName> = {
 
 export default function HomeScreen() {
   const [appState, setAppState] = useState<AppState>("home");
+  const [navigationStack, setNavigationStack] = useState<AppState[]>([]);
   const [activeTab, setActiveTab] = useState<HomeTab>("student");
   const [studentName, setStudentName] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -89,34 +93,7 @@ export default function HomeScreen() {
     [studentName, roomCode],
   );
 
-  const handleTeacherLogin = (teacher: Teacher) => {
-    setCurrentTeacher(teacher);
-    setAppState("teacher-menu");
-  };
-
-  const handleRoomCreated = (room: Room) => {
-    setCurrentRoom(room);
-    setAppState("room-dashboard");
-  };
-
-  const handleStudentJoin = () => {
-    if (!isStudentFormValid) return;
-    setAppState("student-dashboard");
-  };
-
-  const handleStartGame = (gameId: string) => {
-    setCurrentGameId(gameId);
-    setDemoMode(false);
-    setAppState("student-game");
-  };
-
-  const handleViewResults = () => {
-    setAppState("teacher-reports");
-  };
-
-  const handleReset = () => {
-    setAppState("home");
-    setActiveTab("student");
+  const resetAppData = useCallback(() => {
     setStudentName("");
     setRoomCode("");
     setCurrentTeacher(null);
@@ -124,22 +101,62 @@ export default function HomeScreen() {
     setCurrentGameId("image-word");
     setGameResults(null);
     setDemoMode(false);
+  }, []);
+
+  const handleTeacherLogin = (teacher: Teacher) => {
+    setCurrentTeacher(teacher);
+    navigateTo("teacher-menu");
+  };
+
+  const handleRoomCreated = (room: Room) => {
+    setCurrentRoom(room);
+    navigateTo("room-dashboard");
+  };
+
+  const handleStudentJoin = () => {
+    if (!isStudentFormValid) return;
+    navigateTo("student-dashboard");
+  };
+
+  const handleStartGame = (gameId: string) => {
+    setCurrentGameId(gameId);
+    setDemoMode(false);
+    navigateTo("student-game");
+  };
+
+  const handleViewResults = () => {
+    navigateTo("teacher-reports");
+  };
+
+  const handleLogoPress = () => {
+    navigateTo("home");
+  };
+
+  const handleReset = () => {
+    resetAppData();
+    setNavigationStack([]);
+    if (isWeb && typeof window !== "undefined") {
+      window.history.replaceState({ appState: "home" }, "", window.location.pathname);
+    }
+    setAppState("home");
   };
 
   const handleTeacherNavigate = (section: string) => {
-    if (section === "rooms") {
-      setAppState("room-creation");
-    }
+    if (Platform.OS !== "web") {
+      if (section === "rooms") {
+        navigateTo("room-creation");
+      }
 
-    if (section === "reports") {
-      setAppState("teacher-reports");
+      if (section === "reports") {
+        navigateTo("teacher-reports");
+      }
     }
   };
 
   const handleDemoGameStart = (gameId: string) => {
     setCurrentGameId(gameId);
     setDemoMode(true);
-    setAppState("student-game");
+    navigateTo("student-game");
   };
   const insets = useSafeAreaInsets();
   const headerPadding = useMemo(
@@ -161,12 +178,81 @@ export default function HomeScreen() {
     [insets.bottom, insets.left, insets.right],
   );
 
+  const isWeb = Platform.OS === "web";
+  // const gameCardBasis = isWeb ? "48%" : "100%"; // Removed in favor of NativeWind
+  // const featureCardBasis = isWeb ? "30%" : "100%"; // Removed in favor of NativeWind
+
+  useEffect(() => {
+    if (!isWeb || typeof window === "undefined") return;
+    window.history.replaceState({ appState: "home" }, "", window.location.pathname);
+  }, [isWeb]);
+
+  useEffect(() => {
+    if (!isWeb || typeof window === "undefined") return;
+    const handlePopState = (event: any) => {
+      const targetState = (event.state?.appState as AppState) ?? "home";
+      setNavigationStack((prev) =>
+        prev.length > 0 ? prev.slice(0, prev.length - 1) : prev,
+      );
+      setAppState(targetState);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [isWeb]);
+
+  const navigateTo = useCallback(
+    (nextState: AppState) => {
+      if (nextState === appState) return;
+      setNavigationStack((prev) => [...prev, appState]);
+      if (isWeb && typeof window !== "undefined") {
+        window.history.pushState({ appState: nextState }, "", window.location.pathname);
+      }
+      setAppState(nextState);
+    },
+    [appState, isWeb],
+  );
+
+  const handleBackNavigation = useCallback(() => {
+    if (navigationStack.length === 0) return false;
+
+    if (isWeb && typeof window !== "undefined") {
+      window.history.back();
+      return true;
+    }
+
+    setNavigationStack((prev) => {
+      const previousState = prev[prev.length - 1];
+      setAppState(previousState);
+      return prev.slice(0, -1);
+    });
+    return true;
+  }, [isWeb, navigationStack.length]);
+
+  useEffect(() => {
+    if (isWeb) return;
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleBackNavigation,
+    );
+    return () => subscription.remove();
+  }, [handleBackNavigation, isWeb]);
+
   if (appState === "teacher-login") {
-    return <TeacherLogin onLogin={handleTeacherLogin} onBack={handleReset} />;
+    const screen = (
+      <TeacherLogin onLogin={handleTeacherLogin} onBack={handleBackNavigation} />
+    );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
   }
 
   if (appState === "teacher-menu" && currentTeacher) {
-    return (
+    const screen = (
       <NavigationMenu
         userType="teacher"
         userName={currentTeacher.name}
@@ -174,29 +260,50 @@ export default function HomeScreen() {
         onLogout={handleReset}
       />
     );
+    return isWeb ? (
+      <WebLayout scrollable={false} fullWidth onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
   }
 
   if (appState === "teacher-reports" && currentTeacher) {
-    return (
+    const screen = (
       <TeacherReports
         teacherName={currentTeacher.name}
-        onBack={() => setAppState("teacher-menu")}
+        onBack={handleBackNavigation}
       />
+    );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
     );
   }
 
   if (appState === "room-creation" && currentTeacher) {
-    return (
+    const screen = (
       <RoomCreation
         teacher={currentTeacher}
         onRoomCreated={handleRoomCreated}
-        onBack={() => setAppState("teacher-menu")}
+        onBack={handleBackNavigation}
       />
+    );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
     );
   }
 
   if (appState === "room-dashboard" && currentRoom) {
-    return (
+    const screen = (
       <RoomDashboard
         room={currentRoom}
         onStartGame={() =>
@@ -206,13 +313,20 @@ export default function HomeScreen() {
           setCurrentRoom((prev) => (prev ? { ...prev, isActive: false } : prev))
         }
         onViewResults={handleViewResults}
-        onBack={() => setAppState("teacher-menu")}
+        onBack={handleBackNavigation}
       />
+    );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
     );
   }
 
   if (appState === "student-dashboard") {
-    return (
+    const screen = (
       <StudentDashboard
         studentName={studentName}
         roomCode={roomCode}
@@ -220,20 +334,27 @@ export default function HomeScreen() {
         onLeaveRoom={handleReset}
       />
     );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
   }
 
   if (appState === "student-game") {
     const difficulty = demoMode ? "easy" : (currentRoom?.difficulty ?? "easy");
     const timeLimit = demoMode ? 60 : (currentRoom?.duration ?? 10) * 60;
 
-    return (
+    const screen = (
       <GameLauncher
         gameId={currentGameId}
         difficulty={difficulty}
         timeLimit={timeLimit}
         onGameComplete={(results) => {
           setGameResults(results);
-          setAppState("student-results");
+          navigateTo("student-results");
           if (!demoMode && currentRoom) {
             setCurrentRoom({ ...currentRoom, isActive: false });
           }
@@ -241,62 +362,133 @@ export default function HomeScreen() {
         onBack={handleReset}
       />
     );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
   }
 
   if (appState === "student-results" && gameResults) {
-    return (
+    const screen = (
       <StudentResults
         studentName={demoMode ? "Demo" : studentName}
         gameId={currentGameId}
         results={gameResults}
-        onPlayAgain={() => setAppState("student-game")}
+        onPlayAgain={() => navigateTo("student-game")}
         onBackToHome={handleReset}
       />
     );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
   }
 
-  return (
-    <View style={styles.root}>
-      <View style={[styles.topBar, headerPadding]}>
-        <View style={styles.topBarContent}>
-          <Image
-            source={require("../../../../assets/images/nunito_logo.png")}
-            style={styles.topBarLogo}
-          />
-          <View style={styles.topBarDivider} />
-          <View style={styles.topBarTextGroup}>
-            <Text style={styles.topBarTitle}>
-              Mini juegos para conciencia fonológica
-            </Text>
-            <Text style={styles.topBarSubtitle}>
-              Programa de Integración Escolar
-            </Text>
+  const homeContent = (
+    <View className="flex-1 bg-background">
+      {!isWeb && (
+        <View
+          style={[
+            headerPadding,
+            {
+              backgroundColor: palette.primary,
+              borderBottomColor: withAlpha(palette.primaryOn, 0.25),
+            },
+          ]}
+          className="border-b shadow-md"
+        >
+          <View className="flex-row items-center gap-4">
+            <TouchableOpacity
+              className="flex-row items-center gap-3"
+              activeOpacity={0.85}
+              onPress={handleLogoPress}
+            >
+              <Image
+                source={require("../../../../assets/images/nunito_logo.png")}
+                style={{ width: 140, height: 48 }}
+                resizeMode="contain"
+              />
+              <Text className="text-2xl font-extrabold tracking-tight">
+                <Text style={{ color: "#E4483F" }}>N</Text>
+                <Text style={{ color: "#F4A71D" }}>
+                  u
+                </Text>
+                <Text style={{ color: "#3F9D4C" }}>
+                  n
+                </Text>
+                <Text style={{ color: "#1E88E5" }}>
+                  i
+                </Text>
+                <Text style={{ color: "#F4A71D" }}>
+                  t
+                </Text>
+                <Text style={{ color: "#3F9D4C" }}>
+                  o
+                </Text>
+              </Text>
+            </TouchableOpacity>
+            <View
+              className="h-10 border-l"
+              style={{ borderColor: withAlpha(palette.primaryOn, 0.35) }}
+            />
+            <View className="flex-1 gap-1">
+              <Text
+                className="text-base font-semibold"
+                style={{ color: palette.primaryOn }}
+              >
+                Mini juegos para conciencia fonológica
+              </Text>
+              <Text style={{ color: withAlpha(palette.primaryOn, 0.8) }}>
+                Programa de Integración Escolar
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
+      )}
 
       <ScrollView
+        className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, scrollPadding]}
+        contentContainerStyle={scrollPadding}
+        contentContainerClassName="flex-grow gap-7"
+        keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.welcome}>
-          <Text style={styles.welcomeTitle}>¡Bienvenidos a Nunito!</Text>
-          <Text style={styles.welcomeSubtitle}>
+        <View className="items-center gap-3 px-1">
+          <Text className="text-3xl font-bold text-center text-text">
+            ¡Bienvenidos a Nunito!
+          </Text>
+          <Text
+            className="text-base text-center max-w-[520px] text-muted"
+          >
             Una aplicación diseñada para niños de 6 a 9 años del Programa de
             Integración Escolar. Aprende jugando con nuestros mini juegos
             educativos.
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Acceso a la aplicación</Text>
-            <Text style={styles.cardSubtitle}>
+        <View
+          className="rounded-3xl p-6 space-y-5 border shadow-md bg-surface border-border"
+        >
+          <View className="items-center gap-1">
+            <Text className="text-[22px] font-bold text-center text-text">
+              Acceso a la aplicación
+            </Text>
+            <Text
+              className="text-base text-center text-muted"
+            >
               Selecciona tu rol para comenzar
             </Text>
           </View>
 
-          <View style={styles.tabContainer}>
+          <View
+            className="flex-row rounded-xl p-1.5 bg-surfaceMuted"
+          >
             {(Object.keys(TAB_CONFIG) as HomeTab[]).map((tabKey) => {
               const config = TAB_CONFIG[tabKey];
               return (
@@ -312,21 +504,25 @@ export default function HomeScreen() {
           </View>
 
           {activeTab === "student" ? (
-            <View style={styles.form}>
-              <View style={styles.field}>
-                <Text style={styles.label}>Tu nombre</Text>
+            <View className="gap-4">
+              <View className="gap-2">
+                <Text className="text-base font-semibold text-text">
+                  Tu nombre
+                </Text>
                 <TextInput
-                  style={styles.input}
+                  className="rounded-xl border px-4 py-3 text-base border-border bg-surface text-text"
                   value={studentName}
                   onChangeText={setStudentName}
                   placeholder="Escribe tu nombre aquí"
                   placeholderTextColor={withAlpha(palette.muted, 0.6)}
                 />
               </View>
-              <View style={styles.field}>
-                <Text style={styles.label}>Código de la sala</Text>
+              <View className="gap-2">
+                <Text className="text-base font-semibold text-text">
+                  Código de la sala
+                </Text>
                 <TextInput
-                  style={styles.input}
+                  className="rounded-xl border px-4 py-3 text-base border-border bg-surface text-text"
                   value={roomCode}
                   onChangeText={setRoomCode}
                   placeholder="Código de 6 dígitos"
@@ -334,88 +530,75 @@ export default function HomeScreen() {
                   maxLength={6}
                 />
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.primaryButton,
-                  !isStudentFormValid && styles.disabledButton,
-                ]}
-                disabled={!isStudentFormValid}
-                onPress={handleStudentJoin}
-              >
-                <Feather name="play" size={18} color={palette.primaryOn} />
-                <Text style={styles.primaryButtonText}>Unirse a la sala</Text>
-              </TouchableOpacity>
+              <NunitoButton disabled={!isStudentFormValid} onPress={handleStudentJoin}>
+                <Feather name="play" size={18} color={palette.background} />
+                <Text className="text-base font-bold text-primaryOn">
+                  Unirse a la sala
+                </Text>
+              </NunitoButton>
             </View>
           ) : (
-            <View style={styles.form}>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => setAppState("teacher-login")}
-              >
-                <Feather name="log-in" size={18} color={palette.primaryOn} />
-                <Text style={styles.primaryButtonText}>
+            <View className="gap-4">
+              <NunitoButton onPress={() => navigateTo("teacher-login")}>
+                <Feather name="log-in" size={18} color={palette.background} />
+                <Text className="text-base font-bold text-primaryOn">
                   Iniciar sesión / Registrarse
                 </Text>
-              </TouchableOpacity>
-              <Text style={styles.helperText}>
-                Inicia sesión o crea una cuenta para acceder a las funciones de
-                profesor.
-              </Text>
+              </NunitoButton>
             </View>
           )}
         </View>
 
-        <View style={styles.gamesSection}>
-          <Text style={styles.sectionTitle}>Mini juegos disponibles</Text>
-          <View style={styles.gamesGrid}>
+        <View className="gap-4">
+          <Text
+            className="text-2xl font-bold text-text"
+          >
+            Mini juegos disponibles
+          </Text>
+          <View className="flex-row flex-wrap gap-4">
             {gameDefinitions.map((game) => {
               const theme = gameThemeTokens[game.color];
               const iconName = GAME_ICON_MAP[game.id] ?? "star";
               return (
                 <TouchableOpacity
                   key={game.id}
-                  style={[
-                    styles.gameCard,
-                    {
-                      backgroundColor: theme.container,
-                      borderColor: withAlpha(theme.accent, 0.6),
-                    },
-                  ]}
+                  activeOpacity={0.9}
+                  className="rounded-2xl p-5 gap-3 border-2 shadow-lg w-full md:w-[48%] lg:w-[30%] active:scale-95 transition-transform"
+                  style={{
+                    backgroundColor: theme.container,
+                    borderColor: theme.accent,
+                  }}
                   onPress={() => handleDemoGameStart(game.id)}
                 >
                   <View
-                    style={[
-                      styles.gameIconBadge,
-                      {
-                        backgroundColor: withAlpha(theme.accent, 0.12),
-                        borderColor: withAlpha(theme.accent, 0.4),
-                      },
-                    ]}
+                    className="h-16 w-16 rounded-full items-center justify-center mb-2"
+                    style={{
+                      backgroundColor: theme.accent,
+                    }}
                   >
-                    <Feather name={iconName} size={26} color={theme.accent} />
+                    <Feather name={iconName} size={28} color={theme.on} />
                   </View>
-                  <View style={styles.gameTextGroup}>
-                    <Text style={[styles.gameTitle, { color: theme.accent }]}>
+                  <View className="gap-1.5">
+                    <Text className="text-lg font-bold" style={{ color: theme.accent }}>
                       {game.name}
                     </Text>
-                    <Text style={styles.gameDescription}>
+                    <Text className="text-sm text-muted">
                       {game.description}
                     </Text>
                   </View>
                   <View
-                    style={[
-                      styles.demoPill,
-                      {
-                        borderColor: theme.accent,
-                        backgroundColor: withAlpha(theme.accent, 0.16),
-                      },
-                    ]}
+                    className="rounded-full px-4 py-2 border-2 self-start mt-2"
+                    style={{
+                      borderColor: theme.accent,
+                      backgroundColor: withAlpha(theme.accent, 0.1),
+                    }}
                   >
-                    <Text
-                      style={[styles.demoPillText, { color: theme.accent }]}
-                    >
-                      Probar demo
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <Feather name="play" size={14} color={theme.accent} />
+                      <Text className="text-sm font-semibold" style={{ color: theme.accent }}>
+                        Probar Demo
+                      </Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -423,9 +606,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.features}>
-          <Text style={styles.sectionTitle}>Características</Text>
-          <View style={styles.featuresGrid}>
+        <View className="gap-4 mb-12">
+          <Text
+            className="text-2xl font-bold text-text"
+          >
+            Características
+          </Text>
+          <View className="flex-row flex-wrap gap-4">
             {FEATURE_ITEMS.map((feature) => (
               <FeatureCard
                 key={feature.title}
@@ -439,6 +626,14 @@ export default function HomeScreen() {
       </ScrollView>
     </View>
   );
+
+  return isWeb ? (
+    <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+      {homeContent}
+    </WebLayout>
+  ) : (
+    homeContent
+  );
 }
 
 interface TabButtonProps {
@@ -451,17 +646,19 @@ interface TabButtonProps {
 function TabButton({ label, icon, isActive, onPress }: TabButtonProps) {
   return (
     <TouchableOpacity
-      style={[styles.tabButton, isActive && styles.tabButtonActive]}
+      className={`flex-1 items-center py-2.5 rounded-lg ${isActive ? "bg-white shadow-sm" : ""
+        }`}
       onPress={onPress}
+      activeOpacity={0.9}
     >
-      <View style={styles.tabButtonContent}>
+      <View className="flex-row items-center gap-2">
         <Feather
           name={icon}
           size={16}
           color={isActive ? palette.primaryOn : palette.muted}
         />
         <Text
-          style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}
+          className={`text-base font-semibold ${isActive ? "text-primary" : "text-text"}`}
         >
           {label}
         </Text>
@@ -478,287 +675,21 @@ interface FeatureCardProps {
 
 function FeatureCard({ title, description, icon }: FeatureCardProps) {
   return (
-    <View style={styles.featureCard}>
-      <View style={styles.featureIconBadge}>
+    <View
+      className="rounded-2xl p-4 gap-2 border shadow-sm flex-grow w-full md:w-[30%] bg-surface border-border"
+    >
+      <View
+        className="h-10 w-10 rounded-full items-center justify-center"
+        style={{ backgroundColor: withAlpha(palette.primary, 0.12) }}
+      >
         <Feather name={icon} size={20} color={palette.primary} />
       </View>
-      <Text style={styles.featureTitle}>{title}</Text>
-      <Text style={styles.featureDescription}>{description}</Text>
+      <Text className="text-base font-bold text-text">
+        {title}
+      </Text>
+      <Text className="text-sm text-muted">
+        {description}
+      </Text>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: palette.background,
-  },
-  topBar: {
-    backgroundColor: palette.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: withAlpha(palette.primaryOn, 0.25),
-    shadowColor: "#00000033",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  topBarContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  topBarLogo: {
-    width: 140,
-    height: 48,
-    resizeMode: "contain",
-  },
-  topBarDivider: {
-    height: 40,
-    borderLeftWidth: 1,
-    borderLeftColor: withAlpha(palette.primaryOn, 0.35),
-    marginLeft: 8,
-    marginRight: 12,
-  },
-  topBarTextGroup: {
-    flex: 1,
-    gap: 2,
-  },
-  topBarTitle: {
-    color: palette.primaryOn,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  topBarSubtitle: {
-    color: withAlpha(palette.primaryOn, 0.8),
-    fontSize: 13,
-  },
-  content: {
-    gap: 28,
-  },
-  welcome: {
-    alignItems: "center",
-    gap: 12,
-  },
-  welcomeTitle: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: palette.text,
-    textAlign: "center",
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: palette.muted,
-    textAlign: "center",
-    maxWidth: 520,
-  },
-  card: {
-    backgroundColor: palette.surface,
-    borderRadius: 22,
-    padding: 24,
-    gap: 20,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#0000001f",
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  cardHeader: {
-    alignItems: "center",
-    gap: 6,
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: palette.text,
-    textAlign: "center",
-  },
-  cardSubtitle: {
-    fontSize: 15,
-    color: palette.muted,
-    textAlign: "center",
-  },
-  tabContainer: {
-    flexDirection: "row",
-    borderRadius: 999,
-    backgroundColor: withAlpha(palette.primary, 0.06),
-    padding: 4,
-    gap: 6,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
-  tabButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  tabButtonActive: {
-    backgroundColor: palette.primary,
-    shadowColor: "#0000001a",
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  tabButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: palette.muted,
-  },
-  tabButtonTextActive: {
-    color: palette.primaryOn,
-  },
-  form: {
-    gap: 16,
-  },
-  field: {
-    gap: 8,
-  },
-  helperText: {
-    fontSize: 14,
-    color: withAlpha(palette.muted, 0.8),
-    textAlign: "center",
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: palette.text,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: palette.surface,
-    color: palette.text,
-    fontSize: 16,
-  },
-  primaryButton: {
-    backgroundColor: palette.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  primaryButtonText: {
-    color: palette.primaryOn,
-    fontWeight: "700",
-    fontSize: 16,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  gamesSection: {
-    gap: 16,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  gamesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-  },
-  gameCard: {
-    flexBasis: "48%",
-    minWidth: "48%",
-    borderRadius: 20,
-    padding: 18,
-    gap: 14,
-    borderWidth: 1,
-    shadowColor: "#00000014",
-    shadowOpacity: 0.16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  gameIconBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-  },
-  gameTextGroup: {
-    gap: 6,
-  },
-  gameTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  gameDescription: {
-    fontSize: 14,
-    color: palette.muted,
-  },
-  demoPill: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-  },
-  demoPillText: {
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  features: {
-    gap: 18,
-    marginBottom: 48,
-  },
-  featuresGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-  },
-  featureCard: {
-    flexBasis: "30%",
-    minWidth: "30%",
-    backgroundColor: palette.surface,
-    borderRadius: 18,
-    padding: 18,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: palette.border,
-    shadowColor: "#00000014",
-    shadowOpacity: 0.12,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
-    flexGrow: 1,
-    alignItems: "flex-start",
-  },
-  featureIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: withAlpha(palette.primary, 0.12),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: palette.muted,
-  },
-});

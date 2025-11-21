@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
+import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 import type { Teacher } from "@/features/home/types";
 
@@ -74,7 +75,7 @@ export default function TeacherLogin({ onLogin, onBack }: TeacherLoginProps) {
       <View style={styles.card}>
         <Text style={styles.title}>Acceso para Profesores</Text>
         <Text style={styles.subtitle}>
-          Inicia sesión o crea tu cuenta para administrar las salas virtuales.
+          Inicia sesión o regístrate para crear salas virtuales.
         </Text>
 
         <View style={styles.tabContainer}>
@@ -124,24 +125,25 @@ export default function TeacherLogin({ onLogin, onBack }: TeacherLoginProps) {
             </View>
             <View>
               <Text style={styles.label}>Contraseña</Text>
-              <TextInput
-                accessibilityLabel="Contraseña"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-                value={loginForm.password}
-                onChangeText={(value) =>
-                  setLoginForm((prev) => ({ ...prev, password: value }))
-                }
-                placeholder="••••••••"
-                placeholderTextColor={palette.muted}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword((prev) => !prev)}
-              >
-                <Text style={styles.link}>
-                  {showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  accessibilityLabel="Contraseña"
+                  secureTextEntry={!showPassword}
+                  style={[styles.input, { paddingRight: 40 }]}
+                  value={loginForm.password}
+                  onChangeText={(value) =>
+                    setLoginForm((prev) => ({ ...prev, password: value }))
+                  }
+                  placeholder="••••••••"
+                  placeholderTextColor={palette.muted}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword((prev) => !prev)}
+                >
+                  <Feather name={showPassword ? "eye-off" : "eye"} size={20} color={palette.muted} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         ) : (
@@ -176,78 +178,106 @@ export default function TeacherLogin({ onLogin, onBack }: TeacherLoginProps) {
             </View>
             <View>
               <Text style={styles.label}>Contraseña</Text>
-              <TextInput
-                accessibilityLabel="Contraseña"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-                value={registerForm.password}
-                onChangeText={(value) =>
-                  setRegisterForm((prev) => ({ ...prev, password: value }))
-                }
-                placeholder="••••••••"
-                placeholderTextColor={palette.muted}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  accessibilityLabel="Contraseña"
+                  secureTextEntry={!showPassword}
+                  style={[styles.input, { paddingRight: 40 }]}
+                  value={registerForm.password}
+                  onChangeText={(value) =>
+                    setRegisterForm((prev) => ({ ...prev, password: value }))
+                  }
+                  placeholder="••••••••"
+                  placeholderTextColor={palette.muted}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword((prev) => !prev)}
+                >
+                  <Feather name={showPassword ? "eye-off" : "eye"} size={20} color={palette.muted} />
+                </TouchableOpacity>
+              </View>
             </View>
             <View>
               <Text style={styles.label}>Confirmar contraseña</Text>
-              <TextInput
-                accessibilityLabel="Confirmar contraseña"
-                secureTextEntry={!showPassword}
-                style={styles.input}
-                value={registerForm.confirmPassword}
-                onChangeText={(value) =>
-                  setRegisterForm((prev) => ({
-                    ...prev,
-                    confirmPassword: value,
-                  }))
-                }
-                placeholder="••••••••"
-                placeholderTextColor={palette.muted}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  accessibilityLabel="Confirmar contraseña"
+                  secureTextEntry={!showPassword}
+                  style={[styles.input, { paddingRight: 40 }]}
+                  value={registerForm.confirmPassword}
+                  onChangeText={(value) =>
+                    setRegisterForm((prev) => ({
+                      ...prev,
+                      confirmPassword: value,
+                    }))
+                  }
+                  placeholder="••••••••"
+                  placeholderTextColor={palette.muted}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword((prev) => !prev)}
+                >
+                  <Feather name={showPassword ? "eye-off" : "eye"} size={20} color={palette.muted} />
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
-              <Text style={styles.link}>
-                {showPassword ? "Ocultar contraseñas" : "Mostrar contraseñas"}
-              </Text>
-            </TouchableOpacity>
+            {/* Eliminado el texto para mostrar/ocultar contraseñas, ahora se usa el icono de ojo */}
           </View>
         )}
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={[styles.primaryButton, isLoading && styles.disabledButton]}
+        <NunitoButton
+          style={isLoading && styles.disabledButton}
+          contentStyle={styles.primaryButton}
           onPress={handleSubmit}
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={palette.primaryOn} />
+            <ActivityIndicator color={palette.muted} />
           ) : (
             <View style={styles.primaryButtonContent}>
               <Feather
                 name={mode === "login" ? "log-in" : "user-plus"}
                 size={18}
-                color={palette.primaryOn}
+                color={palette.background}
               />
               <Text style={styles.primaryButtonText}>
                 {mode === "login" ? "Iniciar sesión" : "Registrarse"}
               </Text>
             </View>
           )}
-        </TouchableOpacity>
+        </NunitoButton>
 
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={styles.secondaryButton}
-          onPress={onBack}
-        >
-          <Feather name="arrow-left" size={18} color={palette.primary} />
-          <Text style={styles.secondaryButtonText}>Volver al inicio</Text>
-        </TouchableOpacity>
+        <NunitoButton contentStyle={[styles.secondaryButton, { backgroundColor: "#FFFFFF", borderColor: palette.border, borderWidth: 1, shadowColor: "transparent", shadowOpacity: 0, elevation: 0 }]}> 
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.secondaryButtonInner}
+            onPress={onBack}
+          >
+            <Feather name="arrow-left" size={18} color={palette.background} />
+            <Text style={[styles.secondaryButtonText, { color: "#6b6b6b" }]}>Volver al inicio</Text>
+          </TouchableOpacity>
+        </NunitoButton>
       </View>
     </ScrollView>
   );
 }
 const styles = StyleSheet.create({
+    passwordInputContainer: {
+      position: "relative",
+      justifyContent: "center",
+    },
+    eyeIcon: {
+      position: "absolute",
+      right: 12,
+      top: "50%",
+      marginTop: -15,
+      padding: 4,
+      zIndex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
   wrapper: {
     flex: 1,
     backgroundColor: palette.background,
@@ -283,32 +313,32 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: "row",
-    borderRadius: 999,
-    backgroundColor: withAlpha(palette.primary, 0.08),
-    padding: 4,
+    borderRadius: 12,
+    backgroundColor: palette.surfaceMuted,
+    padding: 3,
     gap: 6,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 999,
+    paddingVertical: 9,
+    borderRadius: 10,
     alignItems: "center",
   },
   activeTab: {
-    backgroundColor: palette.primary,
-    shadowColor: "#0000001a",
-    shadowOpacity: 0.14,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 2,
+    backgroundColor: palette.background,
+    shadowColor: "rgba(0, 0, 0, 0.10)",
+    shadowOpacity: 1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
+    elevation: 1,
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "600",
-    color: palette.muted,
+    color: palette.text,
   },
   activeTabText: {
-    color: palette.primaryOn,
+    color: palette.text,
   },
   form: {
     gap: 18,
@@ -321,12 +351,16 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: palette.border,
-    borderRadius: 14,
+    borderRadius: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 10,
+    fontSize: 14,
     color: palette.text,
-    backgroundColor: withAlpha(palette.primary, 0.02),
+    backgroundColor: palette.surface,
+    shadowColor: "rgba(0, 0, 0, 0.05)",
+    shadowOpacity: 1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 2,
   },
   link: {
     marginTop: 6,
@@ -334,16 +368,14 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   primaryButton: {
-    backgroundColor: palette.primary,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
+    backgroundColor: "#197870",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     justifyContent: "center",
-    shadowColor: "#00000022",
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   primaryButtonText: {
     color: palette.primaryOn,
@@ -355,14 +387,16 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.primary,
+    backgroundColor: withAlpha(palette.primary, 0.04),
+  },
+  secondaryButtonInner: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: palette.primary,
-    backgroundColor: withAlpha(palette.primary, 0.04),
   },
   secondaryButtonText: {
     color: palette.primary,

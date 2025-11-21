@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 
-import { palette } from '@/theme/colors';
+import { palette, withAlpha } from '@/theme/colors';
 import { formatSeconds } from '@/utils/time';
 
 import type { GameComponentProps } from './types';
@@ -65,6 +65,14 @@ interface StatsState {
 }
 
 export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplete }: GameComponentProps) {
+  const theme = useMemo(
+    () => ({
+      container: palette.violetContainer,
+      accent: palette.violet,
+      onAccent: palette.violetOn,
+    }),
+    []
+  );
   const questions = useMemo(() => questionBank[difficulty] ?? questionBank.easy, [difficulty]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
@@ -74,7 +82,7 @@ export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplet
   const [timeRemaining, setTimeRemaining] = useState(timeLimit);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const questionStartRef = useRef(Date.now());
-  const [, setStats] = useState<StatsState>({
+  const [stats, setStats] = useState<StatsState>({
     correct: 0,
     incorrect: 0,
     responses: [],
@@ -85,6 +93,8 @@ export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplet
   const currentQuestion = questions[questionIndex];
   const totalQuestions = questions.length;
   const progress = ((questionIndex + 1) / totalQuestions) * 100;
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 900;
 
   useEffect(() => {
     questionStartRef.current = Date.now();
@@ -192,107 +202,162 @@ export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplet
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.wrapper}>
+    <ScrollView contentContainerStyle={[styles.wrapper, { backgroundColor: theme.container }]}>
       <View style={styles.header}>
         <TouchableOpacity onPress={onExit} style={styles.backButton} accessibilityRole="button">
-          <Text style={styles.backText}>← Salir</Text>
+          <Text style={[styles.backText, { color: theme.accent }]}>← Salir</Text>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.timerLabel}>Tiempo restante</Text>
-          <Text style={styles.timerValue}>{formatSeconds(timeRemaining)}</Text>
+          <Text style={[styles.timerValue, { color: theme.accent }]}>{formatSeconds(timeRemaining)}</Text>
         </View>
       </View>
 
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${progress}%` }]} />
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.questionCounter}>
-          Palabra {questionIndex + 1} de {totalQuestions}
-        </Text>
-        <View style={styles.keywordBox}>
-          <Text style={styles.keyword}>{currentQuestion.keyWord}</Text>
-        </View>
-        <Text style={styles.prompt}>Selecciona todas las palabras que rimen con la palabra clave.</Text>
-
-        <View style={styles.optionList}>
-          {currentQuestion.options.map((option) => {
-            const isSelected = selectedAnswers.includes(option);
-            const isCorrect = showFeedback && currentQuestion.correctRhymes.includes(option);
-            const isIncorrectChoice = showFeedback && isSelected && !isCorrect;
-
-            return (
-              <TouchableOpacity
-                key={option}
-                style={[
-                  styles.optionButton,
-                  isSelected && styles.optionSelected,
-                  isCorrect && styles.optionCorrect,
-                  isIncorrectChoice && styles.optionIncorrect,
-                ]}
-                onPress={() => handleToggleAnswer(option)}
-                accessibilityRole="button"
-              >
-                <Text style={styles.optionText}>{option}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {!showFeedback && (
-          <TouchableOpacity
-            style={[styles.submitButton, selectedAnswers.length === 0 && styles.submitButtonDisabled]}
-            onPress={handleSubmitAnswer}
-            disabled={selectedAnswers.length === 0}
-            accessibilityRole="button"
-          >
-            <Text style={styles.submitButtonText}>
-              {selectedAnswers.length === 0
-                ? 'Selecciona al menos una opción'
-                : `Confirmar (${selectedAnswers.length})`}
+      <View style={[styles.metaCard, { backgroundColor: theme.accent }]}>
+        <View style={styles.metaTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.metaTitle, { color: theme.onAccent }]}>Identificación de Rimas</Text>
+            <Text style={[styles.metaSubtitle, { color: withAlpha(theme.onAccent, 0.85) }]}>
+              Pregunta {questionIndex + 1} de {totalQuestions}
             </Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity style={styles.hintButton} onPress={() => setShowHint((prev) => !prev)}>
-          <Text style={styles.hintText}>{showHint ? 'Ocultar pista' : 'Ver pista'}</Text>
-        </TouchableOpacity>
-
-        {showHint && !showFeedback && (
-          <Text style={styles.hintMessage}>Escucha el final de la palabra clave y busca sonidos similares.</Text>
-        )}
-
-        {showFeedback && (
-          <View style={[styles.feedback, answerWasCorrect ? styles.feedbackSuccess : styles.feedbackError]}>
-            <Text style={styles.feedbackTitle}>
-              {answerWasCorrect ? '¡Gran trabajo!' : 'Buen intento, revisa las rimas correctas.'}
-            </Text>
-            <Text style={styles.feedbackSubtitle}>Rimas correctas:</Text>
-            <View style={styles.correctRhymes}>
-              {currentQuestion.correctRhymes.map((rhyme) => (
-                <View key={rhyme} style={styles.rhymeChip}>
-                  <Text style={styles.rhymeText}>{rhyme}</Text>
-                </View>
-              ))}
-            </View>
           </View>
-        )}
-
-        {showFeedback && questionIndex < totalQuestions - 1 && (
-          <TouchableOpacity style={styles.nextButton} onPress={handleNextQuestion} accessibilityRole="button">
-            <Text style={styles.nextButtonText}>Siguiente palabra</Text>
-          </TouchableOpacity>
-        )}
+          <View style={styles.metaBadges}>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{formatSeconds(timeRemaining)}</Text>
+            </View>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {stats.correct}/{totalQuestions}
+              </Text>
+            </View>
+            {stats.streak > 0 && (
+              <View style={[styles.badge, styles.streakBadge]}>
+                <Text style={[styles.badgeText, styles.streakText]}>🔥 {stats.streak}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <View style={[styles.metaProgress, { backgroundColor: withAlpha(theme.onAccent, 0.25) }]}>
+          <View style={[styles.metaProgressFill, { width: `${progress}%` }]} />
+        </View>
       </View>
+
+      <View style={[styles.columns, { flexDirection: isWideLayout ? 'row' : 'column' }]}>
+        <View style={[styles.card, styles.columnCard, { borderColor: withAlpha(theme.accent, 0.2) }]}>
+          <Text style={styles.sectionTitle}>Palabra clave</Text>
+          <View
+            style={[
+              styles.keywordBox,
+              { backgroundColor: withAlpha(theme.accent, 0.16), borderColor: withAlpha(theme.accent, 0.4) },
+            ]}
+          >
+            <Text style={[styles.keyword, { color: theme.accent }]}>{currentQuestion.keyWord}</Text>
+          </View>
+          <Text style={styles.prompt}>Encuentra todas las palabras que rimen con la palabra clave.</Text>
+
+          <TouchableOpacity style={styles.hintButton} onPress={() => setShowHint((prev) => !prev)}>
+            <Text style={[styles.hintText, { color: theme.accent }]}>
+              {showHint ? 'Ocultar pista' : '💡 Ver pista'}
+            </Text>
+          </TouchableOpacity>
+          {showHint && !showFeedback && (
+            <Text style={styles.hintMessage}>Las palabras que riman terminan con sonidos similares.</Text>
+          )}
+        </View>
+
+        <View style={[styles.card, styles.columnCard, { borderColor: withAlpha(theme.accent, 0.2) }]}>
+          <Text style={styles.sectionTitle}>Selecciona las palabras que riman</Text>
+          <Text style={styles.sectionSubtitle}>Puedes escoger más de una opción</Text>
+
+          <View style={styles.optionList}>
+            {currentQuestion.options.map((option) => {
+              const isSelected = selectedAnswers.includes(option);
+              const isCorrect = showFeedback && currentQuestion.correctRhymes.includes(option);
+              const isIncorrectChoice = showFeedback && isSelected && !isCorrect;
+
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.optionButton,
+                    { backgroundColor: withAlpha(theme.accent, 0.12), borderColor: withAlpha(theme.accent, 0.28) },
+                    isSelected && { backgroundColor: withAlpha(theme.accent, 0.28), borderColor: theme.accent },
+                    isCorrect && styles.optionCorrect,
+                    isIncorrectChoice && styles.optionIncorrect,
+                  ]}
+                  onPress={() => handleToggleAnswer(option)}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      (isSelected || isCorrect || isIncorrectChoice) && styles.optionTextActive,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {!showFeedback && (
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                { backgroundColor: theme.accent },
+                selectedAnswers.length === 0 && styles.submitButtonDisabled,
+              ]}
+              onPress={handleSubmitAnswer}
+              disabled={selectedAnswers.length === 0}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.submitButtonText, { color: theme.onAccent }]}>
+                {selectedAnswers.length === 0
+                  ? 'Selecciona al menos una opción'
+                  : `Confirmar (${selectedAnswers.length})`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {showFeedback && (
+        <View style={[styles.feedback, answerWasCorrect ? styles.feedbackSuccess : styles.feedbackError]}>
+          <Text style={styles.feedbackTitle}>{answerWasCorrect ? '✅ Correcto' : '❌ Incorrecto'}</Text>
+          <Text style={styles.feedbackTitle}>
+            {answerWasCorrect
+              ? stats.streak >= 3
+                ? `¡INCREÍBLE RACHA! Llevas ${stats.streak}.`
+                : '¡Excelente! Has encontrado las rimas.'
+              : `Las palabras que riman con "${currentQuestion.keyWord}" son:`}
+          </Text>
+          <View style={styles.correctRhymes}>
+            {currentQuestion.correctRhymes.map((rhyme) => (
+              <View key={rhyme} style={styles.rhymeChip}>
+                <Text style={styles.rhymeText}>{rhyme}</Text>
+              </View>
+            ))}
+          </View>
+          {questionIndex < totalQuestions - 1 && (
+            <TouchableOpacity
+              style={[styles.nextButton, { backgroundColor: theme.accent }]}
+              onPress={handleNextQuestion}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.nextButtonText, { color: theme.onAccent }]}>Siguiente palabra</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    padding: 24,
-    gap: 24,
+    padding: 20,
+    gap: 18,
     backgroundColor: palette.background,
   },
   header: {
@@ -320,42 +385,99 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: palette.text,
   },
-  progressBar: {
+  metaCard: {
+    borderRadius: 18,
+    padding: 16,
+    gap: 10,
+    shadowColor: '#00000022',
+    shadowOpacity: 0.18,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  metaTop: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+  },
+  metaTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  metaSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  metaBadges: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  metaProgress: {
     height: 8,
-    borderRadius: 4,
-    backgroundColor: '#E5E7EB',
+    borderRadius: 999,
     overflow: 'hidden',
   },
-  progressFill: {
+  metaProgressFill: {
     height: '100%',
-    backgroundColor: palette.primary,
+    borderRadius: 999,
+    backgroundColor: '#2D6943',
   },
   card: {
     backgroundColor: palette.surface,
+    borderWidth: 1,
     borderRadius: 20,
-    padding: 20,
-    gap: 16,
+    padding: 18,
+    gap: 14,
     shadowColor: '#00000022',
     shadowOpacity: 0.12,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 12,
     elevation: 2,
   },
-  questionCounter: {
-    fontSize: 14,
+  columns: {
+    gap: 14,
+  },
+  columnCard: {
+    flex: 1,
+  },
+  badge: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: '#38693C',
+  },
+  badgeText: {
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  streakBadge: {
+    backgroundColor: '#facc15',
+  },
+  streakText: {
+    color: '#854d0e',
+  },
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: palette.text,
+    textAlign: 'center',
+  },
+  sectionSubtitle: {
     color: palette.muted,
+    textAlign: 'center',
   },
   keywordBox: {
     alignSelf: 'center',
-    backgroundColor: '#DDD6FE',
-    paddingVertical: 24,
-    paddingHorizontal: 32,
-    borderRadius: 16,
+    paddingVertical: 22,
+    paddingHorizontal: 30,
+    borderRadius: 18,
+    borderWidth: 2,
   },
   keyword: {
     fontSize: 40,
     fontWeight: '800',
-    color: '#4C1D95',
+    textAlign: 'center',
   },
   prompt: {
     fontSize: 16,
@@ -363,28 +485,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   optionList: {
-    gap: 12,
+    gap: 10,
   },
   optionButton: {
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 12,
     backgroundColor: '#F3F4F6',
-  },
-  optionSelected: {
-    backgroundColor: '#E0E7FF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   optionCorrect: {
     backgroundColor: '#DCFCE7',
+    borderColor: '#16a34a',
   },
   optionIncorrect: {
     backgroundColor: '#FEE2E2',
+    borderColor: '#f87171',
   },
   optionText: {
     fontSize: 16,
     fontWeight: '600',
     color: palette.text,
     textAlign: 'center',
+  },
+  optionTextActive: {
+    color: palette.text,
   },
   submitButton: {
     backgroundColor: palette.primary,
@@ -417,21 +543,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     gap: 12,
+    borderWidth: 1,
   },
   feedbackSuccess: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#ecfdf3',
+    borderColor: '#86efac',
   },
   feedbackError: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#fef2f2',
+    borderColor: '#fca5a5',
   },
   feedbackTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: palette.text,
-    textAlign: 'center',
-  },
-  feedbackSubtitle: {
-    color: palette.muted,
     textAlign: 'center',
   },
   correctRhymes: {
@@ -441,23 +566,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rhymeChip: {
-    backgroundColor: '#DDD6FE',
+    backgroundColor: palette.violetContainer,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   rhymeText: {
-    color: '#4C1D95',
+    color: palette.violet,
     fontWeight: '700',
   },
   nextButton: {
     marginTop: 4,
-    backgroundColor: palette.primary,
+    backgroundColor: palette.violet,
     paddingVertical: 14,
     borderRadius: 12,
   },
   nextButtonText: {
-    color: palette.primaryOn,
     fontWeight: '700',
     textAlign: 'center',
   },

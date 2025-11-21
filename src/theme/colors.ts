@@ -28,6 +28,7 @@ export const palette = {
   blue: "#415F91",
   blueOn: "#FFFFFF",
   blueContainer: "#D6E3FF",
+  black: "#000000",
 };
 
 export type PaletteKey = keyof typeof palette;
