@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { validateRoomCode } from "@/services/useRooms";
 import {
   BackHandler,
   Image,
@@ -18,8 +19,9 @@ import RoomCreation from "@/features/home/components/RoomCreation";
 import RoomDashboard from "@/features/home/components/RoomDashboard";
 import StudentDashboard from "@/features/home/components/StudentDashboard";
 import StudentResults from "@/features/home/components/StudentResults";
-import TeacherLogin from "@/features/home/components/TeacherLogin";
 import TeacherReports from "@/features/home/components/TeacherReports";
+import LoginScreen from "@/features/auth/screens/LoginScreen";
+import RegisterScreen from "@/features/auth/screens/RegisterScreen";
 import {
   gameDefinitions,
   gameThemeTokens,
@@ -33,6 +35,7 @@ import type {
 import { palette, withAlpha } from "@/theme/colors";
 import NunitoButton from "@/features/home/components/NunitoButton";
 import WebLayout from "@/features/home/components/WebLayout";
+import { useAuth } from "@/contexts/AuthContext";
 
 const HOME_TABS = {
   student: "student" as const,
@@ -78,6 +81,8 @@ const GAME_ICON_MAP: Record<string, FeatherIconName> = {
 
 export default function HomeScreen() {
   const [appState, setAppState] = useState<AppState>("home");
+  const [roomCodeError, setRoomCodeError] = useState<string>("");
+  const [isLoadingRoomCode, setIsLoadingRoomCode] = useState(false);
   const [navigationStack, setNavigationStack] = useState<AppState[]>([]);
   const [activeTab, setActiveTab] = useState<HomeTab>("student");
   const [studentName, setStudentName] = useState("");
@@ -87,6 +92,8 @@ export default function HomeScreen() {
   const [currentGameId, setCurrentGameId] = useState("image-word");
   const [gameResults, setGameResults] = useState<GameResults | null>(null);
   const [demoMode, setDemoMode] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
 
   const isStudentFormValid = useMemo(
     () => studentName.trim().length > 0 && roomCode.trim().length > 0,
@@ -113,8 +120,16 @@ export default function HomeScreen() {
     navigateTo("room-dashboard");
   };
 
-  const handleStudentJoin = () => {
+  const handleStudentJoin = async () => {
     if (!isStudentFormValid) return;
+    setIsLoadingRoomCode(true);
+    setRoomCodeError("");
+    const exists = await validateRoomCode(roomCode.trim());
+    setIsLoadingRoomCode(false);
+    if (!exists) {
+      setRoomCodeError("El código de sala no existe. Verifica e intenta nuevamente.");
+      return;
+    }
     navigateTo("student-dashboard");
   };
 
@@ -129,6 +144,10 @@ export default function HomeScreen() {
   };
 
   const handleLogoPress = () => {
+    // Don't navigate to home if user is authenticated and in teacher menu
+    if (appState === "teacher-menu" && (user || currentTeacher)) {
+      return;
+    }
     navigateTo("home");
   };
 
@@ -230,7 +249,7 @@ export default function HomeScreen() {
   }, [isWeb, navigationStack.length]);
 
   useEffect(() => {
-    if (isWeb) return;
+    if (!isWeb) return;
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
       handleBackNavigation,
@@ -238,9 +257,29 @@ export default function HomeScreen() {
     return () => subscription.remove();
   }, [handleBackNavigation, isWeb]);
 
-  if (appState === "teacher-login") {
+  // Auto-navigate authenticated users to teacher menu if they're on home screen
+  useEffect(() => {
+    console.log("Auth check effect - appState:", appState, "user:", user, "isAuthenticated:", isAuthenticated);
+    if (user && isAuthenticated && appState === "home") {
+      console.log("User is authenticated but on home screen, navigating to teacher-menu");
+      setAppState("teacher-menu");
+    }
+  }, [user, isAuthenticated, appState]);
+
+  // Login Screen
+  if (appState === "teacher-login" && !showRegister) {
+    console.log("Rendering login screen");
     const screen = (
-      <TeacherLogin onLogin={handleTeacherLogin} onBack={handleBackNavigation} />
+      <LoginScreen
+        onLoginSuccess={() => {
+          console.log("Login success callback called, navigating to teacher-menu");
+          // After successful login, the user will be in the auth context
+          // We can safely navigate to teacher menu
+          navigateTo("teacher-menu");
+        }}
+        onNavigateToRegister={() => setShowRegister(true)}
+        onBack={handleBackNavigation}
+      />
     );
     return isWeb ? (
       <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
@@ -251,11 +290,35 @@ export default function HomeScreen() {
     );
   }
 
-  if (appState === "teacher-menu" && currentTeacher) {
+  // Register Screen
+  if (appState === "teacher-login" && showRegister) {
+    const screen = (
+      <RegisterScreen
+        onRegisterSuccess={() => {
+          // After successful registration, the user will be in the auth context
+          // We can safely navigate to teacher menu
+          navigateTo("teacher-menu");
+        }}
+        onNavigateToLogin={() => setShowRegister(false)}
+        onBack={() => setShowRegister(false)}
+      />
+    );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
+  }
+
+  if (appState === "teacher-menu" && (currentTeacher || user)) {
+    console.log("Rendering teacher-menu, user:", user, "currentTeacher:", currentTeacher);
+    const teacherName = user?.name || currentTeacher?.name || "Profesor";
     const screen = (
       <NavigationMenu
         userType="teacher"
-        userName={currentTeacher.name}
+        userName={teacherName}
         onNavigate={handleTeacherNavigate}
         onLogout={handleReset}
       />
@@ -269,10 +332,11 @@ export default function HomeScreen() {
     );
   }
 
-  if (appState === "teacher-reports" && currentTeacher) {
+  if (appState === "teacher-reports" && (currentTeacher || user)) {
+    const teacherName = user?.name || currentTeacher?.name || "Profesor";
     const screen = (
       <TeacherReports
-        teacherName={currentTeacher.name}
+        teacherName={teacherName}
         onBack={handleBackNavigation}
       />
     );
@@ -285,10 +349,13 @@ export default function HomeScreen() {
     );
   }
 
-  if (appState === "room-creation" && currentTeacher) {
+  if (appState === "room-creation" && (currentTeacher || user)) {
+    const teacher = currentTeacher || (user ? { name: user.name, email: user.email } : null);
+    if (!teacher) return null;
+
     const screen = (
       <RoomCreation
-        teacher={currentTeacher}
+        teacher={teacher}
         onRoomCreated={handleRoomCreated}
         onBack={handleBackNavigation}
       />
@@ -524,16 +591,22 @@ export default function HomeScreen() {
                 <TextInput
                   className="rounded-xl border px-4 py-3 text-base border-border bg-surface text-text"
                   value={roomCode}
-                  onChangeText={setRoomCode}
+                  onChangeText={text => {
+                    setRoomCode(text);
+                    setRoomCodeError("");
+                  }}
                   placeholder="Código de 6 dígitos"
                   placeholderTextColor={withAlpha(palette.muted, 0.6)}
                   maxLength={6}
                 />
+                {roomCodeError ? (
+                  <Text className="text-sm text-red-500 mt-1">{roomCodeError}</Text>
+                ) : null}
               </View>
-              <NunitoButton disabled={!isStudentFormValid} onPress={handleStudentJoin}>
+              <NunitoButton disabled={!isStudentFormValid || isLoadingRoomCode} onPress={handleStudentJoin}>
                 <Feather name="play" size={18} color={palette.background} />
                 <Text className="text-base font-bold text-primaryOn">
-                  Unirse a la sala
+                  {isLoadingRoomCode ? "Validando..." : "Unirse a la sala"}
                 </Text>
               </NunitoButton>
             </View>

@@ -8,38 +8,53 @@ export interface BaseQuestion {
 // Image-Word Association Game
 export interface ImageWordQuestion extends BaseQuestion {
     type: "image-word";
-    word: string;
-    imageUrl: string;
-    alternatives: string[]; // Wrong options
-    hint?: string;
+    text?: string;
+    options?: {
+        word: string;
+        imageUrl: string;
+        alternatives: string[];
+        hint?: string;
+        difficulty?: "easy" | "medium" | "hard";
+    };
 }
 
 // Syllable Count Game
 export interface SyllableCountQuestion extends BaseQuestion {
     type: "syllable-count";
-    word: string;
-    syllableCount: number;
-    syllableSeparation: string; // e.g., "ca-sa"
-    alternatives: number[]; // Wrong syllable counts
-    hint?: string;
+    text?: string;
+    options?: {
+        word: string;
+        syllableCount: number;
+        syllableSeparation: string;
+        alternatives: number[];
+        hint?: string;
+        difficulty?: "easy" | "medium" | "hard";
+    };
 }
 
 // Rhyme Identification Game
 export interface RhymeQuestion extends BaseQuestion {
     type: "rhyme-identification";
-    mainWord: string;
-    rhymingWords: string[]; // Words that rhyme
-    nonRhymingWords: string[]; // Words that don't rhyme
-    hint?: string;
+    text?: string;
+    options?: {
+        mainWord: string;
+        rhymingWords: string[];
+        nonRhymingWords: string[];
+        hint?: string;
+        difficulty?: "easy" | "medium" | "hard";
+    };
 }
 
 // Audio Recognition Game
 export interface AudioQuestion extends BaseQuestion {
     type: "audio-recognition";
-    text: string; // The word/phrase that will be heard
-    audioUrl: string;
-    alternatives: string[]; // Wrong options
-    hint?: string;
+    text?: string;
+    options?: {
+        audioUrl: string;
+        alternatives: string[];
+        hint?: string;
+        difficulty?: "easy" | "medium" | "hard";
+    };
 }
 
 // Union type for all question types

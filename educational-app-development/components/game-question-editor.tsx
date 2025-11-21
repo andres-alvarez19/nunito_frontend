@@ -37,11 +37,31 @@ export function GameQuestionEditor({ gameType, gameTitle }: GameQuestionEditorPr
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
 
-  const handleAddQuestion = (formData: any) => {
-    const newQuestion: Question = { id: Math.max(...questions.map((q) => q.id), 0) + 1, ...formData }
-    setQuestions([...questions, newQuestion])
-    setIsModalOpen(false)
-    setEditingQuestion(null)
+  // TODO: Reemplaza este valor por el testSuiteId real, por ejemplo desde props o contexto
+  const testSuiteId = "c2364221-269d-4fc6-b701-c44f98573031";
+
+  const handleAddQuestion = async (formData: any) => {
+    // Construir el payload según lo que espera el backend
+    const payload = {
+      text: formData.text,
+      type: gameType,
+      options: {
+        word: formData.text,
+        imageUrl: formData.imageUrl || "", // Asegúrate de subir la imagen y obtener la URL
+        alternatives: formData.options,
+        hint: formData.hint,
+        difficulty: formData.difficulty,
+      },
+      correctAnswer: formData.correctAnswer,
+      testSuiteId: testSuiteId,
+    };
+    // Aquí deberías llamar a tu controlador para crear la pregunta en el backend
+    // await questionsController.createQuestion(testSuiteId, payload);
+    // Para mantener la demo local, también actualiza el estado local:
+    const newQuestion: Question = { id: Math.max(...questions.map((q) => q.id), 0) + 1, ...payload };
+    setQuestions([...questions, newQuestion]);
+    setIsModalOpen(false);
+    setEditingQuestion(null);
   }
 
   const handleEditQuestion = (question: Question) => {

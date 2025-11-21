@@ -7,40 +7,42 @@ import {
     TextInput,
     View,
     Image,
-    Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-
 import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette } from "@/theme/colors";
 import type { Question } from "@/features/home/types/questions";
-
+import { useUpload } from "@/services/useUpload";
+import { useNotification } from "@/contexts/NotificationContext";
 interface QuestionFormModalProps {
     isOpen: boolean;
     gameType: "image-word" | "syllable-count" | "rhyme-identification" | "audio-recognition";
     question?: Question;
-    onSave: (question: Partial<Question>) => void;
+    testSuiteId: string;
+    onSave: (question: any) => void;
     onClose: () => void;
 }
-
 export default function QuestionFormModal({
     isOpen,
     gameType,
     question,
+    testSuiteId,
     onSave,
     onClose,
 }: QuestionFormModalProps) {
+    const { uploadImage, uploadAudio, uploading, error: uploadError } = useUpload();
+    const { error: showError } = useNotification();
     // Common fields
     const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("easy");
     const [hint, setHint] = useState("");
-
+    // Campo para el texto de la pregunta
+    const [questionText, setQuestionText] = useState("");
     // Image-Word fields
     const [word, setWord] = useState("");
     const [imageUrl, setImageUrl] = useState("");
     const [alternatives, setAlternatives] = useState<string[]>(["", "", ""]);
-
     // Syllable Count fields
     const [syllableCount, setSyllableCount] = useState(1);
     const [syllableSeparation, setSyllableSeparation] = useState("");
@@ -57,39 +59,37 @@ export default function QuestionFormModal({
     // Update form when question changes (for editing)
     useEffect(() => {
         if (question) {
-            setDifficulty(question.difficulty || "easy");
-            setHint(question.hint || "");
-
+            setDifficulty(question.options?.difficulty || "easy");
+            setHint(question.options?.hint || "");
+            setQuestionText(question.text || "");
             switch (question.type) {
                 case "image-word":
-                    setWord(question.word);
-                    setImageUrl(question.imageUrl);
-                    setAlternatives(question.alternatives.length > 0 ? question.alternatives : ["", "", ""]);
+                    setWord(question.options?.word || "");
+                    setImageUrl(question.options?.imageUrl || "");
+                    setAlternatives(Array.isArray(question.options?.alternatives) && question.options.alternatives.length > 0 ? question.options.alternatives : ["", "", ""]);
                     break;
-
                 case "syllable-count":
-                    setWord(question.word);
-                    setSyllableCount(question.syllableCount);
-                    setSyllableSeparation(question.syllableSeparation);
-                    setSyllableAlternatives(question.alternatives);
+                    setWord(question.options?.word || "");
+                    setSyllableCount(question.options?.syllableCount || 1);
+                    setSyllableSeparation(question.options?.syllableSeparation || "");
+                    setSyllableAlternatives(Array.isArray(question.options?.alternatives) ? question.options.alternatives : [2, 3]);
                     break;
-
                 case "rhyme-identification":
-                    setMainWord(question.mainWord);
-                    setRhymingWords(question.rhymingWords.length > 0 ? question.rhymingWords : ["", ""]);
-                    setNonRhymingWords(question.nonRhymingWords.length > 0 ? question.nonRhymingWords : ["", ""]);
+                    setMainWord(question.options?.mainWord || "");
+                    setRhymingWords(Array.isArray(question.options?.rhymingWords) && question.options.rhymingWords.length > 0 ? question.options.rhymingWords : ["", ""]);
+                    setNonRhymingWords(Array.isArray(question.options?.nonRhymingWords) && question.options.nonRhymingWords.length > 0 ? question.options.nonRhymingWords : ["", ""]);
                     break;
-
                 case "audio-recognition":
-                    setWord(question.text);
-                    setAudioUrl(question.audioUrl);
-                    setAlternatives(question.alternatives.length > 0 ? question.alternatives : ["", "", ""]);
+                    setWord(question.text || "");
+                    setAudioUrl(question.options?.audioUrl || "");
+                    setAlternatives(Array.isArray(question.options?.alternatives) && question.options.alternatives.length > 0 ? question.options.alternatives : ["", "", ""]);
                     break;
             }
         } else {
             // Reset form for new question
             setDifficulty("easy");
             setHint("");
+            setQuestionText("");
             setWord("");
             setImageUrl("");
             setAlternatives(["", "", ""]);
@@ -107,7 +107,7 @@ export default function QuestionFormModal({
         const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
         if (!permissionResult.granted) {
-            Alert.alert("Permiso requerido", "Se necesita permiso para acceder a las imágenes");
+            showError("Se necesita permiso para acceder a las imágenes");
             return;
         }
 
@@ -119,7 +119,12 @@ export default function QuestionFormModal({
         });
 
         if (!result.canceled && result.assets[0]) {
-            setImageUrl(result.assets[0].uri);
+            try {
+                const url = await uploadImage(result.assets[0].uri);
+                setImageUrl(url);
+            } catch (e) {
+                showError("No se pudo subir la imagen");
+            }
         }
     };
 
@@ -131,69 +136,75 @@ export default function QuestionFormModal({
             });
 
             if (!result.canceled && result.assets[0]) {
-                setAudioUrl(result.assets[0].uri);
+                try {
+                    const url = await uploadAudio(result.assets[0].uri);
+                    setAudioUrl(url);
+                } catch (e) {
+                    showError("No se pudo subir el audio");
+                }
             }
         } catch (error) {
-            Alert.alert("Error", "No se pudo seleccionar el archivo de audio");
+            showError("No se pudo seleccionar el archivo de audio");
         }
     };
 
     const handleSave = () => {
-        let questionData: Partial<Question>;
-
-        switch (gameType) {
-            case "image-word":
-                questionData = {
-                    type: "image-word",
+        let questionData: any = {};
+        if (gameType === "image-word") {
+            questionData = {
+                text: questionText,
+                type: "image-word",
+                options: {
                     word,
                     imageUrl,
                     alternatives: alternatives.filter((a) => a.trim()),
                     hint: hint || undefined,
                     difficulty,
-                };
-                break;
-
-            case "syllable-count":
-                questionData = {
-                    type: "syllable-count",
+                },
+            };
+        } else if (gameType === "syllable-count") {
+            questionData = {
+                text: questionText,
+                type: "syllable-count",
+                options: {
                     word,
                     syllableCount,
                     syllableSeparation,
                     alternatives: syllableAlternatives,
                     hint: hint || undefined,
                     difficulty,
-                };
-                break;
-
-            case "rhyme-identification":
-                questionData = {
-                    type: "rhyme-identification",
+                },
+            };
+        } else if (gameType === "rhyme-identification") {
+            questionData = {
+                text: questionText,
+                type: "rhyme-identification",
+                options: {
                     mainWord,
                     rhymingWords: rhymingWords.filter((w) => w.trim()),
                     nonRhymingWords: nonRhymingWords.filter((w) => w.trim()),
                     hint: hint || undefined,
                     difficulty,
-                };
-                break;
-
-            case "audio-recognition":
-                questionData = {
-                    type: "audio-recognition",
-                    text: word,
+                },
+            };
+        } else if (gameType === "audio-recognition") {
+            questionData = {
+                text: questionText,
+                type: "audio-recognition",
+                options: {
                     audioUrl,
                     alternatives: alternatives.filter((a) => a.trim()),
                     hint: hint || undefined,
                     difficulty,
-                };
-                break;
+                },
+            };
         }
-
         onSave(questionData);
-    };
+    }
 
-    const renderGameSpecificFields = () => {
-        switch (gameType) {
-            case "image-word":
+        // Renderiza los campos específicos según el tipo de juego
+        const renderGameSpecificFields = () => {
+            if (gameType === "image-word") {
                 return (
                     <>
                         {/* Word */}
@@ -207,7 +218,6 @@ export default function QuestionFormModal({
                                 placeholderTextColor={palette.muted}
                             />
                         </View>
-
                         {/* Image */}
                         <View className="gap-2">
                             <Text className="text-sm font-semibold text-text">Imagen</Text>
@@ -222,9 +232,7 @@ export default function QuestionFormModal({
                                             className="w-32 h-32 rounded-lg"
                                             resizeMode="cover"
                                         />
-                                        <Text className="text-sm text-primary font-medium">
-                                            Cambiar imagen
-                                        </Text>
+                                        <Text className="text-sm text-primary font-medium">Cambiar imagen</Text>
                                     </View>
                                 ) : (
                                     <View className="items-center gap-2">
@@ -234,12 +242,9 @@ export default function QuestionFormModal({
                                 )}
                             </Pressable>
                         </View>
-
                         {/* Alternatives */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Alternativas Incorrectas
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Alternativas Incorrectas</Text>
                             {alternatives.map((alt, index) => (
                                 <TextInput
                                     key={index}
@@ -259,15 +264,12 @@ export default function QuestionFormModal({
                                 onPress={() => setAlternatives([...alternatives, ""])}
                             >
                                 <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">
-                                    Agregar alternativa
-                                </Text>
+                                <Text className="text-sm text-primary font-medium">Agregar alternativa</Text>
                             </Pressable>
                         </View>
                     </>
                 );
-
-            case "syllable-count":
+            } else if (gameType === "syllable-count") {
                 return (
                     <>
                         {/* Word */}
@@ -281,12 +283,9 @@ export default function QuestionFormModal({
                                 placeholderTextColor={palette.muted}
                             />
                         </View>
-
                         {/* Syllable Count */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Número de Sílabas (Correcto)
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Número de Sílabas (Correcto)</Text>
                             <TextInput
                                 className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
                                 value={syllableCount.toString()}
@@ -296,12 +295,9 @@ export default function QuestionFormModal({
                                 placeholderTextColor={palette.muted}
                             />
                         </View>
-
                         {/* Syllable Separation */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Separación de Sílabas
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Separación de Sílabas</Text>
                             <TextInput
                                 className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
                                 value={syllableSeparation}
@@ -310,12 +306,9 @@ export default function QuestionFormModal({
                                 placeholderTextColor={palette.muted}
                             />
                         </View>
-
                         {/* Alternatives */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Números Incorrectos
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Números Incorrectos</Text>
                             <View className="flex-row gap-2">
                                 {syllableAlternatives.map((alt, index) => (
                                     <TextInput
@@ -335,15 +328,12 @@ export default function QuestionFormModal({
                         </View>
                     </>
                 );
-
-            case "rhyme-identification":
+            } else if (gameType === "rhyme-identification") {
                 return (
                     <>
                         {/* Main Word */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Palabra Principal
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Palabra Principal</Text>
                             <TextInput
                                 className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
                                 value={mainWord}
@@ -352,12 +342,9 @@ export default function QuestionFormModal({
                                 placeholderTextColor={palette.muted}
                             />
                         </View>
-
                         {/* Rhyming Words */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Palabras que Riman
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Palabras que Riman</Text>
                             {rhymingWords.map((word, index) => (
                                 <TextInput
                                     key={index}
@@ -377,17 +364,12 @@ export default function QuestionFormModal({
                                 onPress={() => setRhymingWords([...rhymingWords, ""])}
                             >
                                 <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">
-                                    Agregar palabra
-                                </Text>
+                                <Text className="text-sm text-primary font-medium">Agregar palabra</Text>
                             </Pressable>
                         </View>
-
                         {/* Non-Rhyming Words */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Palabras que NO Riman
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Palabras que NO Riman</Text>
                             {nonRhymingWords.map((word, index) => (
                                 <TextInput
                                     key={index}
@@ -407,22 +389,17 @@ export default function QuestionFormModal({
                                 onPress={() => setNonRhymingWords([...nonRhymingWords, ""])}
                             >
                                 <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">
-                                    Agregar palabra
-                                </Text>
+                                <Text className="text-sm text-primary font-medium">Agregar palabra</Text>
                             </Pressable>
                         </View>
                     </>
                 );
-
-            case "audio-recognition":
+            } else if (gameType === "audio-recognition") {
                 return (
                     <>
                         {/* Text */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Palabra/Frase que se Oirá
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Palabra/Frase que se Oirá</Text>
                             <TextInput
                                 className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
                                 value={word}
@@ -431,7 +408,6 @@ export default function QuestionFormModal({
                                 placeholderTextColor={palette.muted}
                             />
                         </View>
-
                         {/* Audio */}
                         <View className="gap-2">
                             <Text className="text-sm font-semibold text-text">Audio</Text>
@@ -442,15 +418,9 @@ export default function QuestionFormModal({
                                 {audioUrl ? (
                                     <View className="items-center gap-2">
                                         <Feather name="check-circle" size={48} color={palette.primary} />
-                                        <Text className="text-sm text-primary font-medium">
-                                            Audio seleccionado
-                                        </Text>
-                                        <Text className="text-xs text-muted">
-                                            {audioUrl.split("/").pop()}
-                                        </Text>
-                                        <Text className="text-sm text-primary font-medium mt-2">
-                                            Cambiar audio
-                                        </Text>
+                                        <Text className="text-sm text-primary font-medium">Audio seleccionado</Text>
+                                        <Text className="text-xs text-muted">{audioUrl.split("/").pop()}</Text>
+                                        <Text className="text-sm text-primary font-medium mt-2">Cambiar audio</Text>
                                     </View>
                                 ) : (
                                     <View className="items-center gap-2">
@@ -460,12 +430,9 @@ export default function QuestionFormModal({
                                 )}
                             </Pressable>
                         </View>
-
                         {/* Alternatives */}
                         <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">
-                                Alternativas Incorrectas
-                            </Text>
+                            <Text className="text-sm font-semibold text-text">Alternativas Incorrectas</Text>
                             {alternatives.map((alt, index) => (
                                 <TextInput
                                     key={index}
@@ -485,16 +452,14 @@ export default function QuestionFormModal({
                                 onPress={() => setAlternatives([...alternatives, ""])}
                             >
                                 <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">
-                                    Agregar alternativa
-                                </Text>
+                                <Text className="text-sm text-primary font-medium">Agregar alternativa</Text>
                             </Pressable>
                         </View>
                     </>
                 );
-        }
-    };
-
+            }
+            return null;
+        };
     const getGameTitle = () => {
         switch (gameType) {
             case "image-word":
@@ -520,12 +485,29 @@ export default function QuestionFormModal({
                             </Text>
                             <Text className="text-sm text-muted mt-1">{getGameTitle()}</Text>
                         </View>
-                        <Pressable onPress={onClose}>
-                            <Feather name="x" size={24} color={palette.text} />
+                        <Pressable onPress={onClose} disabled={uploading}>
+                            <Feather name="x" size={24} color={uploading ? palette.muted : palette.text} />
                         </Pressable>
                     </View>
 
+                    {uploadError && (
+                        <View className="bg-error/10 p-3 rounded-lg mb-4">
+                            <Text className="text-error text-sm">{uploadError}</Text>
+                        </View>
+                    )}
+
                     <ScrollView className="gap-4" showsVerticalScrollIndicator={false}>
+                        {/* Input para el texto de la pregunta */}
+                        <View className="gap-2 mb-2">
+                            <Text className="text-sm font-semibold text-text">Texto de la pregunta</Text>
+                            <TextInput
+                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                                value={questionText}
+                                onChangeText={setQuestionText}
+                                placeholder="Ej: ¿Cuál es el diagrama?"
+                                placeholderTextColor={palette.muted}
+                            />
+                        </View>
                         {/* Difficulty */}
                         <View className="gap-2">
                             <Text className="text-sm font-semibold text-text">Dificultad</Text>
@@ -571,13 +553,16 @@ export default function QuestionFormModal({
                     {/* Actions */}
                     <View className="flex-row gap-3 mt-4">
                         <View className="flex-1">
-                            <NunitoButton onPress={handleSave}>
-                                <Text className="text-base font-bold text-primaryOn">Guardar</Text>
+                            <NunitoButton onPress={handleSave} disabled={uploading}>
+                                <Text className="text-base font-bold text-primaryOn">
+                                    {uploading ? "Subiendo..." : "Guardar"}
+                                </Text>
                             </NunitoButton>
                         </View>
                         <View className="flex-1">
                             <NunitoButton
                                 onPress={onClose}
+                                disabled={uploading}
                                 contentStyle={{ backgroundColor: palette.surface }}
                             >
                                 <Text className="text-base font-semibold text-text">Cancelar</Text>
@@ -589,3 +574,4 @@ export default function QuestionFormModal({
         </Modal>
     );
 }
+

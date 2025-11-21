@@ -1,39 +1,71 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Pressable,
     ScrollView,
     Text,
     View,
+    ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import QuestionFormModal from "@/features/home/components/teacher/QuestionFormModal";
 import { palette } from "@/theme/colors";
-import type { Question } from "@/features/home/types/questions";
+import { Question, CreateQuestionRequest, GameId } from "@/models/questions";
+import { useQuestions } from "@/services/useQuestions";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface GameQuestionEditorProps {
-    gameType: "image-word" | "syllable-count" | "rhyme-identification" | "audio-recognition";
+    testSuiteId: string;
+    gameType: GameId;
     gameTitle: string;
 }
 
 export default function GameQuestionEditor({
+    testSuiteId,
     gameType,
     gameTitle,
 }: GameQuestionEditorProps) {
-    const [questions, setQuestions] = useState<Question[]>([]);
+    const {
+        questions,
+        loading,
+        error,
+        fetchQuestions,
+        createQuestion,
+        updateQuestion,
+        deleteQuestion,
+    } = useQuestions();
+    const { error: showError, success: showSuccess } = useNotification();
+
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingQuestion, setEditingQuestion] = useState<Question | undefined>(undefined);
 
-    const handleAddQuestion = (formData: Partial<Question>) => {
-        const newQuestion: Question = {
-            id: Date.now().toString(),
-            createdAt: new Date().toISOString(),
-            difficulty: "easy",
-            ...formData,
-        } as Question;
-        setQuestions([...questions, newQuestion]);
-        setIsModalOpen(false);
-        setEditingQuestion(undefined);
+    useEffect(() => {
+        if (testSuiteId && gameType) {
+            fetchQuestions(testSuiteId, gameType);
+        }
+    }, [testSuiteId, gameType, fetchQuestions]);
+
+    const handleAddQuestion = async (formData: Partial<Question>) => {
+        try {
+            // Construir el payload para que difficulty solo esté dentro de options
+            const { difficulty, ...rest } = formData;
+            const requestData = {
+                ...rest,
+                type: gameType,
+                options: {
+                    ...formData.options,
+                    difficulty: difficulty || "easy",
+                },
+                testSuiteId,
+            } as CreateQuestionRequest;
+
+            await createQuestion(testSuiteId, requestData);
+            setIsModalOpen(false);
+            setEditingQuestion(undefined);
+            showSuccess("Pregunta creada exitosamente");
+        } catch (e) {
+            showError("No se pudo crear la pregunta");
+        }
     };
 
     const handleEditQuestion = (question: Question) => {
@@ -41,20 +73,32 @@ export default function GameQuestionEditor({
         setIsModalOpen(true);
     };
 
-    const handleSaveEdit = (formData: Partial<Question>) => {
+    const handleSaveEdit = async (formData: Partial<Question>) => {
         if (editingQuestion) {
-            setQuestions(
-                questions.map((q) =>
-                    q.id === editingQuestion.id ? { ...q, ...formData } : q
-                )
-            );
-            setIsModalOpen(false);
-            setEditingQuestion(undefined);
+            try {
+                const requestData = {
+                    ...formData,
+                    type: gameType,
+                } as CreateQuestionRequest;
+
+                await updateQuestion(editingQuestion.id, requestData);
+                setIsModalOpen(false);
+                setEditingQuestion(undefined);
+                showSuccess("Pregunta actualizada exitosamente");
+            } catch (e) {
+                showError("No se pudo actualizar la pregunta");
+            }
         }
     };
 
-    const handleDeleteQuestion = (id: string) => {
-        setQuestions(questions.filter((q) => q.id !== id));
+    const handleDeleteQuestion = async (id: string) => {
+        // For now, we'll delete directly. In the future, we could add a confirmation modal
+        try {
+            await deleteQuestion(id);
+            showSuccess("Pregunta eliminada exitosamente");
+        } catch (e) {
+            showError("No se pudo eliminar la pregunta");
+        }
     };
 
     const handleCloseModal = () => {
@@ -132,6 +176,7 @@ export default function GameQuestionEditor({
                 <Pressable
                     className="flex-row items-center gap-2 bg-primary px-4 py-2.5 rounded-xl active:scale-95"
                     onPress={() => setIsModalOpen(true)}
+                    disabled={loading}
                 >
                     <Feather name="plus" size={18} color={palette.primaryOn} />
                     <Text className="text-sm font-semibold text-primaryOn">
@@ -140,9 +185,18 @@ export default function GameQuestionEditor({
                 </Pressable>
             </View>
 
+            {/* Error Message */}
+            {error && (
+                <View className="bg-error/10 p-3 rounded-lg">
+                    <Text className="text-error text-sm">{error}</Text>
+                </View>
+            )}
+
             {/* Questions List */}
             <View className="gap-3">
-                {questions.length === 0 ? (
+                {loading ? (
+                    <ActivityIndicator size="large" color={palette.primary} />
+                ) : questions.length === 0 ? (
                     <View className="items-center py-12 gap-4">
                         <Feather name="help-circle" size={64} color={palette.muted} />
                         <Text className="text-center text-muted">
@@ -179,12 +233,14 @@ export default function GameQuestionEditor({
                                     <Pressable
                                         className="p-2 rounded-lg border border-primary bg-primary/10 active:bg-primary/20"
                                         onPress={() => handleEditQuestion(question)}
+                                        disabled={loading}
                                     >
                                         <Feather name="edit-2" size={16} color={palette.primary} />
                                     </Pressable>
                                     <Pressable
                                         className="p-2 rounded-lg bg-error/10 border border-error/30 active:bg-error/20"
                                         onPress={() => handleDeleteQuestion(question.id)}
+                                        disabled={loading}
                                     >
                                         <Feather name="trash-2" size={16} color={palette.error} />
                                     </Pressable>

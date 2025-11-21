@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { testSuitesController } from "@/controllers/testSuites"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Edit2, Trash2, Play } from "lucide-react"
@@ -51,21 +52,35 @@ export function TestSuiteManager({ onSelectTest }: TestSuiteManagerProps) {
     { id: "audio", name: "Reconocimiento Auditivo" },
   ]
 
-  const handleCreateTest = () => {
+  const handleCreateTest = async () => {
     if (newTestName && selectedGames.length > 0) {
-      const newTest: TestSuite = {
-        id: Math.max(...testSuites.map((t) => t.id), 0) + 1,
-        name: newTestName,
-        description: newTestDesc,
-        games: selectedGames,
-        createdAt: new Date().toISOString().split("T")[0],
-        status: "active",
+      try {
+        // Aquí debes obtener el courseId de alguna forma, por ejemplo de props o contexto
+        const courseId = "0ea633c2-1fba-49be-9e96-4640a8ebba83"; // Reemplaza por el valor real
+        const payload = {
+          name: newTestName,
+          description: newTestDesc,
+          courseId,
+          games: selectedGames,
+        };
+        const createdTestSuite = await testSuitesController.create(payload);
+        // Obtener el test suite completo usando el endpoint /api/test-suites/{testSuiteId}
+        const fullTestSuite = await testSuitesController.getById(createdTestSuite.id);
+        setTestSuites([...testSuites, {
+          id: fullTestSuite.id,
+          name: fullTestSuite.name,
+          description: fullTestSuite.description || "",
+          games: fullTestSuite.games || [],
+          createdAt: fullTestSuite.createdAt,
+          status: "active",
+        }]);
+        setNewTestName("");
+        setNewTestDesc("");
+        setSelectedGames([]);
+        setIsCreating(false);
+      } catch (error) {
+        alert("Error al crear el conjunto de preguntas");
       }
-      setTestSuites([...testSuites, newTest])
-      setNewTestName("")
-      setNewTestDesc("")
-      setSelectedGames([])
-      setIsCreating(false)
     }
   }
 

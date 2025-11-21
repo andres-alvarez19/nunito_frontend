@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Image,
   Pressable,
@@ -20,15 +20,25 @@ import TeacherSidebar, {
 import RoomSummaryCard from "@/features/home/components/teacher/RoomSummaryCard";
 import TeacherSectionCard from "@/features/home/components/teacher/TeacherSectionCard";
 import CourseManager from "@/features/home/components/teacher/CourseManager";
-import TestSuiteManager, {
-  type TestSuite,
-} from "@/features/home/components/teacher/TestSuiteManager";
+import TestSuiteManager from "@/features/home/components/teacher/TestSuiteManager";
+import { TestSuite } from "@/models/testSuites";
 import GameQuestionEditor from "@/features/home/components/teacher/GameQuestionEditor";
+import { useAuth } from "@/contexts/AuthContext";
+import StudentWaitingRoom from "./student/StudentWaitingRoom";
+import StudentGameStart from "./student/StudentGameStart";
 import RoomCreationFlow, {
   type Room,
 } from "@/features/home/components/teacher/RoomCreationFlow";
 import ProgressBar from "@/features/home/components/teacher/ProgressBar";
 import { palette, withAlpha } from "@/theme/colors";
+import TeacherDashboard from "@/features/home/components/TeacherDashboard";
+import MyRooms from "@/features/home/components/MyRooms";
+import { RoomSummaryItem, StudentResult, DifficultyOption } from "@/features/home/types";
+
+import ConnectedUsersList from "@/features/home/components/ConnectedUsersList";
+import TeacherWaitingRoom from "@/features/home/components/teacher/TeacherWaitingRoom";
+import TeacherLiveSession from "@/features/home/components/teacher/TeacherLiveSession";
+import { useDashboard } from "@/services/useDashboard";
 
 interface NavigationMenuProps {
   userType: "teacher" | "student";
@@ -43,29 +53,7 @@ type MenuItem = {
   description: string;
 };
 
-type RoomSummaryItem = {
-  id: string;
-  title: string;
-  gameLabel: string;
-  gameId: "image-word" | "syllable-count" | "rhyme-identification" | "audio-recognition";
-  difficulty: DifficultyOption;
-  createdAt: string;
-  dateTime: string;
-  students: number;
-  average: number;
-  completion: number;
-  status: "active" | "past";
-  studentsResults: StudentResult[];
-};
 
-type StudentResult = {
-  name: string;
-  score: number;
-  correctAnswers: number;
-  totalQuestions: number;
-  averageTime: number;
-  completedAt: string;
-};
 
 const teacherMenuItems: MenuItem[] = [
   { id: "home", label: "Inicio", description: "Panel principal" },
@@ -88,7 +76,7 @@ const studentMenuItems: MenuItem[] = [
   { id: "games", label: "Juegos", description: "Ver actividades disponibles" },
 ];
 
-type DifficultyOption = "easy" | "medium" | "hard";
+
 
 type TeacherConfigSettings = {
   availableGames: Record<string, boolean>;
@@ -183,89 +171,7 @@ const createDefaultSettings = (): TeacherConfigSettings => ({
   }, {}),
 });
 
-const ACTIVE_ROOMS: RoomSummaryItem[] = [
-  {
-    id: "room-a",
-    title: "Clase 3°A - Fonología",
-    gameLabel: "Asociación Imagen-Palabra",
-    gameId: "image-word",
-    difficulty: "easy",
-    createdAt: "2024-01-15T10:30:00Z",
-    dateTime: "15 de enero de 2024, 07:30",
-    students: 8,
-    average: 85,
-    completion: 100,
-    status: "active",
-    studentsResults: [
-      {
-        name: "Ana García",
-        score: 95,
-        correctAnswers: 19,
-        totalQuestions: 20,
-        averageTime: 8.5,
-        completedAt: "2024-01-15T10:45:00Z",
-      },
-      {
-        name: "Carlos López",
-        score: 80,
-        correctAnswers: 16,
-        totalQuestions: 20,
-        averageTime: 12.3,
-        completedAt: "2024-01-15T10:47:00Z",
-      },
-      {
-        name: "María Rodríguez",
-        score: 90,
-        correctAnswers: 18,
-        totalQuestions: 20,
-        averageTime: 9.8,
-        completedAt: "2024-01-15T10:46:00Z",
-      },
-      {
-        name: "Diego Martínez",
-        score: 75,
-        correctAnswers: 15,
-        totalQuestions: 20,
-        averageTime: 15.2,
-        completedAt: "2024-01-15T10:48:00Z",
-      },
-    ],
-  },
-];
 
-const PAST_ROOMS: RoomSummaryItem[] = [
-  {
-    id: "room-b",
-    title: "Clase 2°B - Sílabas",
-    gameLabel: "Conteo de Sílabas",
-    gameId: "syllable-count",
-    difficulty: "medium",
-    createdAt: "2024-01-14T14:15:00Z",
-    dateTime: "14 de enero de 2024, 11:15",
-    students: 6,
-    average: 78,
-    completion: 83,
-    status: "past",
-    studentsResults: [
-      {
-        name: "Sofía Hernández",
-        score: 85,
-        correctAnswers: 17,
-        totalQuestions: 20,
-        averageTime: 11.2,
-        completedAt: "2024-01-14T14:30:00Z",
-      },
-      {
-        name: "Mateo Silva",
-        score: 70,
-        correctAnswers: 14,
-        totalQuestions: 20,
-        averageTime: 18.5,
-        completedAt: "2024-01-14T14:32:00Z",
-      },
-    ],
-  },
-];
 
 export default function NavigationMenu({
   userType,
@@ -273,6 +179,8 @@ export default function NavigationMenu({
   onNavigate,
   onLogout,
 }: NavigationMenuProps) {
+  const { user, logout } = useAuth();
+
   const menuItems = useMemo(
     () => (userType === "teacher" ? teacherMenuItems : studentMenuItems),
     [userType],
@@ -293,8 +201,30 @@ export default function NavigationMenu({
   const [selectedTestSuite, setSelectedTestSuite] = useState<TestSuite | undefined>(undefined);
   const [selectedGameEditor, setSelectedGameEditor] = useState<string | undefined>(undefined);
 
+  // Session state
+  const [sessionStatus, setSessionStatus] = useState<"idle" | "waiting" | "live">("idle");
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [connectedUsers, setConnectedUsers] = useState<{ id: string, name: string }[]>([
+    { id: '1', name: 'Ana' },
+    { id: '2', name: 'Carlos' },
+    { id: '3', name: 'María' },
+  ]);
+  const [activeSessionRoomId, setActiveSessionRoomId] = useState<string | null>(null);
+
   // Room creation state
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+
+  // Dashboard hook
+  const { activeRooms, pastRooms, fetchRooms } = useDashboard();
+
+  // Fetch rooms when entering "rooms" section or on mount if needed
+  // For now, let's fetch when user is teacher
+  useEffect(() => {
+    if (userType === "teacher" && user?.id) {
+      fetchRooms(user.id);
+    }
+  }, [userType, user?.id, fetchRooms]);
+
   const hasChanges = useMemo(
     () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
     [settings, savedSettings],
@@ -363,6 +293,26 @@ export default function NavigationMenu({
     });
 
   const formatSeconds = (seconds: number) => `${seconds.toFixed(1)}s`;
+
+  const handleStartActivity = (roomId: string) => {
+    const room = activeRooms.find((r) => r.id === roomId);
+    if (room) {
+      setActiveSessionRoomId(roomId);
+      setSessionStatus("waiting");
+    }
+  };
+
+  const handleLaunchGame = () => {
+    // In a real app, this would trigger the countdown and then start the game
+    setSessionStatus("live");
+  };
+
+  const handleEndActivity = () => {
+    setSessionStatus("idle");
+    setActiveSessionRoomId(null);
+    // Optionally navigate to reports or show a summary
+    setActiveSection("reports");
+  };
 
   const renderRoomDetailView = (backTarget: "rooms" | "reports") => {
     if (!selectedRoom) return null;
@@ -485,91 +435,75 @@ export default function NavigationMenu({
               </View>
             ))}
           </View>
+
+          {selectedRoom.status === "active" && (
+            <View className="mt-4">
+              <ConnectedUsersList
+                connectedUsers={["Juan Pérez", "María González"]}
+                connectingUsers={["Pedro Sánchez"]}
+              />
+              <View className="mt-4">
+                <TouchableOpacity
+                  className="h-12 rounded-xl bg-primary items-center justify-center shadow-md active:opacity-90"
+                  onPress={() => handleStartActivity(selectedRoom.id)}
+                >
+                  <Text className="text-base font-bold text-primaryOn">Iniciar Actividad</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </TeacherSectionCard>
     );
   };
 
   const renderTeacherSection = () => {
+    // Handle active session views
+    if (sessionStatus === "waiting" && activeSessionRoomId) {
+      const room = activeRooms.find((r) => r.id === activeSessionRoomId);
+      if (room) {
+        return (
+          <TeacherWaitingRoom
+            roomCode={room.code || "----"}
+            gameName={room.gameLabel}
+            connectedUsers={["Juan Pérez", "María González"]}
+            connectingUsers={["Pedro Sánchez"]}
+            onStartActivity={handleLaunchGame}
+            onCancel={() => {
+              setSessionStatus("idle");
+              setActiveSessionRoomId(null);
+            }}
+          />
+        );
+      }
+    }
+
+    if (sessionStatus === "live" && activeSessionRoomId) {
+      const room = activeRooms.find((r) => r.id === activeSessionRoomId);
+      if (room) {
+        return (
+          <TeacherLiveSession
+            roomCode={room.code || "----"}
+            gameName={room.gameLabel}
+            connectedCount={3}
+            onEndActivity={handleEndActivity}
+          />
+        );
+      }
+    }
+
     switch (activeSection) {
       case "home":
         return (
-          <TeacherSectionCard title="Inicio" subtitle="Panel principal">
-            <View className="mt-4 mb-6 gap-2 items-center">
-              <Text className="text-[22px] font-bold text-text">Panel Profesor</Text>
-              <Text className="text-sm text-muted text-center">
-                Desde aquí puedes crear salas, gestionar actividades y ver
-                reportes de tus estudiantes.
-              </Text>
-            </View>
-            <View className="flex-row flex-wrap gap-3 mt-2 mb-5">
-              <View className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-accent/30 bg-accent/5 shadow-md grow">
-                <Text className="text-[13px] font-semibold text-primary mb-1">
-                  Salas activas
-                </Text>
-                <Text className="text-3xl font-bold text-primary">
-                  0
-                </Text>
-                <Text className="mt-1 text-xs text-muted">sesiones en progreso</Text>
-              </View>
-              <View className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-mintContainer/50 bg-mintContainer/30 shadow-md grow">
-                <Text className="text-[13px] font-semibold text-mint mb-1">
-                  Estudiantes
-                </Text>
-                <Text className="text-3xl font-bold text-mint">
-                  0
-                </Text>
-                <Text className="mt-1 text-xs text-muted">
-                  conectados esta semana
-                </Text>
-              </View>
-              <View className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-violetContainer/50 bg-violetContainer/30 shadow-md grow">
-                <Text className="text-[13px] font-semibold text-violet mb-1">
-                  Actividades
-                </Text>
-                <Text
-                  className="text-3xl font-bold text-violet"
-                >
-                  0
-                </Text>
-                <Text className="mt-1 text-xs text-muted">completadas</Text>
-              </View>
-              <View className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-blueContainer/50 bg-blueContainer/30 shadow-md grow">
-                <Text className="text-[13px] font-semibold text-blue mb-1">
-                  Progreso
-                </Text>
-                <Text className="text-3xl font-bold text-blue">
-                  0%
-                </Text>
-                <Text className="mt-1 text-xs text-muted">promedio general</Text>
-              </View>
-            </View>
-            <View className="mt-2 mb-1 rounded-2xl border border-border/80 bg-surface py-3.5 px-4 gap-2 shadow-sm">
-              <View className="gap-1">
-                <View className="flex-row items-center gap-2">
-                  <Feather
-                    name="bar-chart-2"
-                    size={18}
-                    color={palette.primary}
-                  />
-                  <Text className="text-base font-bold text-text">Actividad reciente</Text>
-                </View>
-                <Text className="text-[13px] text-muted">
-                  Últimas salas y reportes
-                </Text>
-              </View>
-              <View className="mt-1.5 p-2.5 rounded-xl bg-background/70">
-                <View className="gap-0.5">
-                  <Text className="text-sm font-semibold text-text">
-                    No hay actividad reciente
-                  </Text>
-                  <Text className="text-xs text-muted">
-                    Crea una nueva sala para comenzar
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </TeacherSectionCard>
+          <TeacherDashboard
+            onNavigateToRoom={(room) => {
+              setSelectedRoom(room);
+              setActiveSection("rooms");
+            }}
+            onCreateRoom={() => setIsCreatingRoom(true)}
+            onNavigateToReports={() => setActiveSection("reports")}
+            onNavigateToRooms={() => setActiveSection("rooms")}
+          />
         );
       case "rooms":
         if (selectedRoom) {
@@ -585,61 +519,49 @@ export default function NavigationMenu({
               onRoomCreated={(newRoom: Room) => {
                 console.log("Nueva sala creada:", newRoom);
                 setIsCreatingRoom(false);
-                // TODO: Add room to list
+                // Add new room to activeRooms so it appears immediately
+                if (typeof activeRooms !== "undefined") {
+                  // Transform Room to RoomSummaryItem for immediate display
+                  const now = new Date();
+                  const summary: RoomSummaryItem = {
+                    id: newRoom.id,
+                    title: newRoom.name,
+                    gameLabel: newRoom.games && newRoom.games.length > 0 ? newRoom.games.map(g => {
+                      const def = gameDefinitions.find(def => def.id === g);
+                      return def ? def.name : g;
+                    }).join(", ") : "Sin juegos",
+                    gameId: newRoom.games[0] || "image-word",
+                    difficulty: newRoom.difficulty,
+                    createdAt: now.toISOString(),
+                    dateTime: now.toLocaleString(),
+                    students: newRoom.students.length,
+                    average: 0,
+                    completion: 0,
+                    status: "active",
+                    studentsResults: [],
+                    code: newRoom.code,
+                  };
+                  activeRooms.push(summary);
+                }
               }}
               onCancel={() => setIsCreatingRoom(false)}
+              onNavigateToQuestions={() => {
+                setIsCreatingRoom(false);
+                setActiveSection("questions");
+              }}
             />
           );
         }
 
         // Show room list
         return (
-          <TeacherSectionCard
-            title="Mis Salas"
-            subtitle="Salas activas y anteriores"
-          >
-            <View className="flex-row justify-between items-center mb-3">
-              <Text className="text-base font-semibold text-text">Salas activas</Text>
-              <Pressable
-                className="flex-row items-center gap-2 bg-primary px-4 py-2.5 rounded-xl active:scale-95"
-                onPress={() => setIsCreatingRoom(true)}
-              >
-                <Feather name="plus" size={18} color={palette.primaryOn} />
-                <Text className="text-sm font-semibold text-primaryOn">
-                  Nueva Sala
-                </Text>
-              </Pressable>
-            </View>
-            <View className="flex-row flex-wrap gap-4">
-              {ACTIVE_ROOMS.map((room) => (
-                <RoomSummaryCard
-                  key={room.id}
-                  title={room.title}
-                  gameLabel={room.gameLabel}
-                  dateTime={room.dateTime}
-                  students={room.students}
-                  average={room.average}
-                  completion={room.completion}
-                  onPressDetails={() => handleRoomDetails(room)}
-                />
-              ))}
-            </View>
-            <Text className="mt-4 mb-1 text-base font-semibold text-text">Salas anteriores</Text>
-            <View className="flex-row flex-wrap gap-4">
-              {PAST_ROOMS.map((room) => (
-                <RoomSummaryCard
-                  key={room.id}
-                  title={room.title}
-                  gameLabel={room.gameLabel}
-                  dateTime={room.dateTime}
-                  students={room.students}
-                  average={room.average}
-                  completion={room.completion}
-                  onPressDetails={() => handleRoomDetails(room)}
-                />
-              ))}
-            </View>
-          </TeacherSectionCard>
+          <MyRooms
+            activeRooms={activeRooms}
+            pastRooms={pastRooms}
+            onNavigateToRoom={setSelectedRoom}
+            onCreateRoom={() => setIsCreatingRoom(true)}
+            onStartActivity={handleStartActivity}
+          />
         );
       case "reports":
         if (selectedRoom) {
@@ -662,7 +584,7 @@ export default function NavigationMenu({
               </View>
             </View>
             <View className="flex-row flex-wrap gap-4">
-              {[...ACTIVE_ROOMS, ...PAST_ROOMS].map((room) => (
+              {[...activeRooms, ...pastRooms].map((room) => (
                 <RoomSummaryCard
                   key={`${room.id}-reports`}
                   title={room.title}
@@ -710,7 +632,10 @@ export default function NavigationMenu({
                     Volver a Cursos
                   </Text>
                 </Pressable>
-                <TestSuiteManager onSelectTestSuite={setSelectedTestSuite} />
+                <TestSuiteManager
+                  courseId={selectedCourse}
+                  onSelectTestSuite={setSelectedTestSuite}
+                />
               </TeacherSectionCard>
             ) : !selectedGameEditor ? (
               <TeacherSectionCard
@@ -737,7 +662,7 @@ export default function NavigationMenu({
                     Selecciona un juego para gestionar sus preguntas
                   </Text>
                   <View className="flex-row flex-wrap gap-3">
-                    {selectedTestSuite.games.map((gameId) => {
+                    {(selectedTestSuite.games || []).map((gameId) => {
                       const game = [
                         { id: "image-word", title: "Asociación Imagen-Palabra" },
                         { id: "syllable-count", title: "Conteo de Sílabas" },
@@ -774,6 +699,7 @@ export default function NavigationMenu({
                   </Text>
                 </Pressable>
                 <GameQuestionEditor
+                  testSuiteId={selectedTestSuite.id}
                   gameType={selectedGameEditor as any}
                   gameTitle={
                     {
@@ -796,6 +722,10 @@ export default function NavigationMenu({
               <View className="flex-row justify-between py-2 border-b border-border/70">
                 <Text className="text-sm font-semibold text-muted">Nombre</Text>
                 <Text className="text-base font-semibold text-text">{userName}</Text>
+              </View>
+              <View className="flex-row justify-between py-2 border-b border-border/70">
+                <Text className="text-sm font-semibold text-muted">Correo</Text>
+                <Text className="text-base font-semibold text-text">{user?.email || "N/A"}</Text>
               </View>
               <View className="flex-row justify-between py-2 border-b border-border/70">
                 <Text className="text-sm font-semibold text-muted">Tipo de usuario</Text>
@@ -998,12 +928,63 @@ export default function NavigationMenu({
                 </Text>
               </NunitoButton>
             </View>
+
+            {/* Logout Button */}
+            <View className="mt-4">
+              <NunitoButton
+                onPress={async () => {
+                  await logout();
+                  onLogout();
+                }}
+                contentStyle={{
+                  backgroundColor: palette.error,
+                }}
+              >
+                <View className="flex-row items-center gap-2">
+                  <Feather name="log-out" size={18} color={palette.primaryOn} />
+                  <Text className="text-base font-bold text-primaryOn">
+                    Cerrar Sesión
+                  </Text>
+                </View>
+              </NunitoButton>
+            </View>
           </TeacherSectionCard>
         );
     }
   };
 
   const renderStudentSection = () => {
+    // If session is waiting, show Waiting Room
+    if (sessionStatus === 'waiting') {
+      return (
+        <StudentWaitingRoom
+          roomCode={roomCode || "----"}
+          connectedStudents={connectedUsers.map(u => u.name)}
+          studentName={userName}
+        />
+      );
+    }
+
+    // If session is live, show Game Start / Active Lobby
+    if (sessionStatus === 'live') {
+      return (
+        <StudentGameStart
+          gameName="Asociación Imagen-Palabra" // Placeholder, should come from session data
+          difficulty="Fácil" // Placeholder
+          timeLimit={600} // Placeholder
+          onStart={() => {
+            // Logic to actually enter the game view
+            // For now, we can just set activeSection to 'games' or handle it via a specific game launcher
+            // But based on current flow, 'games' section lists games. 
+            // If 'live', we probably want to force them into the game or show this start screen.
+            // Let's assume clicking start here launches the specific game.
+            // For this task, we just need to show the screen.
+            console.log("Start Game Pressed");
+          }}
+        />
+      );
+    }
+
     switch (activeSection) {
       case "games":
         return (
@@ -1055,6 +1036,22 @@ export default function NavigationMenu({
                 la pantalla principal.
               </Text>
             </View>
+
+            {/* Temporary Debug Controls for Student Flow */}
+            <View className="mt-4 p-4 bg-gray-100 rounded-lg">
+              <Text className="font-bold mb-2">Debug Controls:</Text>
+              <View className="flex-row gap-2">
+                <TouchableOpacity onPress={() => { setSessionStatus('waiting'); setRoomCode('ABC-123'); }} className="bg-blue-500 px-3 py-2 rounded">
+                  <Text className="text-white">Simulate Join Room</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setSessionStatus('live')} className="bg-green-500 px-3 py-2 rounded">
+                  <Text className="text-white">Simulate Game Start</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setSessionStatus('idle'); setRoomCode(null); }} className="bg-red-500 px-3 py-2 rounded">
+                  <Text className="text-white">Reset</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         );
     }
@@ -1066,15 +1063,15 @@ export default function NavigationMenu({
       className="flex-1 bg-background"
       contentContainerStyle={{ padding: 24, gap: 20, flexGrow: 1 }}
     >
-      <View className="bg-surface rounded-[20px] border border-border p-5 shadow-sm">
+      <View className="bg-surface rounded-[20px] p-5 shadow-sm" style={{ elevation: 2 }}>
         <View className="flex-row items-center gap-4">
           <Image
             source={require("../../../../assets/images/nunito_logo.png")}
             style={{ width: 120, height: 40 }}
             resizeMode="contain"
           />
-          <View className="h-10 border-l border-border" />
-          <View className="flex-1 gap-1">
+          {/* Separator removed */}
+          <View className="flex-1 gap-1 ml-2">
             <Text className="text-[22px] font-bold text-text">Hola, {userName}</Text>
             <Text className="text-sm text-muted">
               {userType === "teacher" ? "Profesor" : "Estudiante"} de Nunito
@@ -1097,7 +1094,10 @@ export default function NavigationMenu({
               <TeacherSidebar
                 activeSection={activeSection as TeacherSectionId}
                 onSelectSection={(id) => handleSelectSection(id)}
-                onLogout={onLogout}
+                onLogout={async () => {
+                  await logout();
+                  onLogout();
+                }}
               />
             </View>
             <ScrollView
@@ -1133,7 +1133,10 @@ export default function NavigationMenu({
               })}
               <TouchableOpacity
                 className="mt-1 py-3 items-center rounded-[14px] bg-primary/6"
-                onPress={onLogout}
+                onPress={async () => {
+                  await logout();
+                  onLogout();
+                }}
               >
                 <Text className="text-primary font-semibold text-[15px]">Cerrar sesión</Text>
               </TouchableOpacity>

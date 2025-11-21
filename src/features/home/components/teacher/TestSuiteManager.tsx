@@ -1,26 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Pressable,
     ScrollView,
     Text,
     TextInput,
     View,
+    ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
-
-export interface TestSuite {
-    id: string;
-    name: string;
-    description: string;
-    games: string[];
-    createdAt: string;
-    status: "active" | "inactive";
-}
+import { useTestSuites } from "@/services/useTestSuites";
+import { TestSuite } from "@/models/testSuites";
+import { useNotification } from "@/contexts/NotificationContext";
 
 interface TestSuiteManagerProps {
+    courseId?: string;
     onSelectTestSuite?: (testSuite: TestSuite) => void;
 }
 
@@ -32,52 +28,66 @@ const ALL_GAMES = [
 ];
 
 export default function TestSuiteManager({
+    courseId,
     onSelectTestSuite,
 }: TestSuiteManagerProps) {
-    const [testSuites, setTestSuites] = useState<TestSuite[]>([
-        {
-            id: "1",
-            name: "Prueba Fonológica Básica",
-            description: "Prueba con los 4 juegos para evaluación inicial",
-            games: ["image-word", "syllable-count"],
-            createdAt: "2024-01-15",
-            status: "active",
-        },
-        {
-            id: "2",
-            name: "Prueba Avanzada",
-            description: "Prueba con enfoque en rimas y audio",
-            games: ["rhyme-identification", "audio-recognition"],
-            createdAt: "2024-01-10",
-            status: "inactive",
-        },
-    ]);
+    const {
+        testSuites,
+        loading,
+        error,
+        fetchTestSuites,
+        createTestSuite,
+        deleteTestSuite,
+    } = useTestSuites();
+    const { error: showError, success: showSuccess } = useNotification();
 
     const [isCreating, setIsCreating] = useState(false);
     const [newTestName, setNewTestName] = useState("");
     const [newTestDesc, setNewTestDesc] = useState("");
     const [selectedGames, setSelectedGames] = useState<string[]>([]);
 
-    const handleCreateTest = () => {
-        if (newTestName.trim() && selectedGames.length > 0) {
-            const newTest: TestSuite = {
-                id: Date.now().toString(),
-                name: newTestName,
-                description: newTestDesc,
-                games: selectedGames,
-                createdAt: new Date().toISOString().split("T")[0],
-                status: "active",
-            };
-            setTestSuites([...testSuites, newTest]);
-            setNewTestName("");
-            setNewTestDesc("");
-            setSelectedGames([]);
-            setIsCreating(false);
+    useEffect(() => {
+        if (courseId) {
+            fetchTestSuites(courseId);
+        }
+    }, [courseId, fetchTestSuites]);
+
+    const handleCreateTest = async () => {
+        if (newTestName.trim() && selectedGames.length > 0 && courseId) {
+            try {
+                console.log("Creating test suite with data:", {
+                    name: newTestName,
+                    description: newTestDesc,
+                    courseId,
+                    games: selectedGames,
+                });
+                const result = await createTestSuite({
+                    name: newTestName,
+                    description: newTestDesc,
+                    courseId,
+                    games: selectedGames,
+                });
+                console.log("Test suite created, received:", result);
+                setNewTestName("");
+                setNewTestDesc("");
+                setSelectedGames([]);
+                setIsCreating(false);
+                showSuccess("Conjunto de pruebas creado exitosamente");
+            } catch (e) {
+                console.error("Error creating test suite:", e);
+                showError("No se pudo crear el conjunto de pruebas");
+            }
         }
     };
 
-    const handleDeleteTest = (id: string) => {
-        setTestSuites(testSuites.filter((t) => t.id !== id));
+    const handleDeleteTest = async (id: string) => {
+        // For now, we'll delete directly. In the future, we could add a confirmation modal
+        try {
+            await deleteTestSuite(id);
+            showSuccess("Conjunto eliminado exitosamente");
+        } catch (e) {
+            showError("No se pudo eliminar el conjunto");
+        }
     };
 
     const toggleGameSelection = (gameId: string) => {
@@ -88,6 +98,14 @@ export default function TestSuiteManager({
         }
     };
 
+    if (!courseId) {
+        return (
+            <View className="items-center py-12">
+                <Text className="text-muted">Selecciona un curso primero.</Text>
+            </View>
+        );
+    }
+
     return (
         <View className="gap-4">
             {/* Header */}
@@ -97,12 +115,13 @@ export default function TestSuiteManager({
                         Conjuntos de Preguntas
                     </Text>
                     <Text className="text-sm text-muted">
-                        Cada conjunto contiene preguntas personalizadas
+                        {testSuites.length} conjunto{testSuites.length !== 1 ? "s" : ""} disponible{testSuites.length !== 1 ? "s" : ""}
                     </Text>
                 </View>
                 <Pressable
                     className="flex-row items-center gap-2 bg-primary px-4 py-2.5 rounded-xl active:scale-95"
                     onPress={() => setIsCreating(true)}
+                    disabled={loading}
                 >
                     <Feather name="plus" size={18} color={palette.primaryOn} />
                     <Text className="text-sm font-semibold text-primaryOn">
@@ -110,6 +129,13 @@ export default function TestSuiteManager({
                     </Text>
                 </Pressable>
             </View>
+
+            {/* Error Message */}
+            {error && (
+                <View className="bg-error/10 p-3 rounded-lg">
+                    <Text className="text-error text-sm">{error}</Text>
+                </View>
+            )}
 
             {/* Create Form */}
             {isCreating && (
@@ -127,6 +153,7 @@ export default function TestSuiteManager({
                             onChangeText={setNewTestName}
                             placeholder="Ej: Prueba Inicial"
                             placeholderTextColor={palette.muted}
+                            editable={!loading}
                         />
                     </View>
                     <View className="gap-2">
@@ -139,6 +166,7 @@ export default function TestSuiteManager({
                             placeholderTextColor={palette.muted}
                             multiline
                             numberOfLines={2}
+                            editable={!loading}
                         />
                     </View>
                     <View className="gap-2">
@@ -151,6 +179,7 @@ export default function TestSuiteManager({
                                     key={game.id}
                                     className="flex-row items-center gap-3 p-3 border border-border rounded-xl bg-surface active:bg-surfaceMuted"
                                     onPress={() => toggleGameSelection(game.id)}
+                                    disabled={loading}
                                 >
                                     <View
                                         className="h-5 w-5 rounded border-2 items-center justify-center"
@@ -174,10 +203,14 @@ export default function TestSuiteManager({
                     </View>
                     <View className="flex-row gap-3">
                         <View className="flex-1">
-                            <NunitoButton onPress={handleCreateTest}>
-                                <Text className="text-base font-bold text-primaryOn">
-                                    Crear Conjunto
-                                </Text>
+                            <NunitoButton onPress={handleCreateTest} disabled={loading}>
+                                {loading ? (
+                                    <ActivityIndicator color={palette.primaryOn} />
+                                ) : (
+                                    <Text className="text-base font-bold text-primaryOn">
+                                        Crear Conjunto
+                                    </Text>
+                                )}
                             </NunitoButton>
                         </View>
                         <View className="flex-1">
@@ -187,6 +220,7 @@ export default function TestSuiteManager({
                                     setSelectedGames([]);
                                 }}
                                 contentStyle={{ backgroundColor: palette.surface }}
+                                disabled={loading}
                             >
                                 <Text className="text-base font-semibold text-text">
                                     Cancelar
@@ -199,7 +233,9 @@ export default function TestSuiteManager({
 
             {/* Test Suites List */}
             <View className="gap-3">
-                {testSuites.length === 0 ? (
+                {loading && !isCreating ? (
+                    <ActivityIndicator size="large" color={palette.primary} />
+                ) : testSuites.length === 0 ? (
                     <View className="items-center py-12 gap-4">
                         <Feather name="layers" size={64} color={palette.muted} />
                         <Text className="text-center text-muted">
@@ -219,7 +255,7 @@ export default function TestSuiteManager({
                                     </Text>
                                     <Text className="text-sm text-muted">{test.description}</Text>
                                     <View className="flex-row flex-wrap gap-2 mt-1">
-                                        {test.games.map((gameId) => {
+                                        {(test.games || []).map((gameId) => {
                                             const gameName =
                                                 ALL_GAMES.find((g) => g.id === gameId)?.name || gameId;
                                             return (

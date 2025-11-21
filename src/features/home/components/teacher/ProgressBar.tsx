@@ -1,6 +1,13 @@
-import { View, Text } from "react-native";
+import { View, Text, LayoutAnimation, Platform, UIManager } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { palette } from "@/theme/colors";
+import { useEffect } from "react";
+
+if (Platform.OS === 'android') {
+    if (UIManager.setLayoutAnimationEnabledExperimental) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+}
 
 interface ProgressBarProps {
     currentStep: 1 | 2 | 3 | 4;
@@ -14,6 +21,10 @@ const STEPS = [
 ];
 
 export default function ProgressBar({ currentStep }: ProgressBarProps) {
+    useEffect(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }, [currentStep]);
+
     return (
         <View className="mb-6">
             <View className="flex-row items-center justify-between">
@@ -27,7 +38,7 @@ export default function ProgressBar({ currentStep }: ProgressBarProps) {
                                     className="flex-1 h-0.5"
                                     style={{
                                         backgroundColor:
-                                            currentStep > step.id ? palette.primary : palette.border,
+                                            currentStep >= step.id ? palette.primary : palette.border,
                                     }}
                                 />
                             )}

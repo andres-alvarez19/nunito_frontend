@@ -56,22 +56,22 @@ export function QuestionForm({ gameType, initialData, isEditing, onSubmit, onCan
         <CardTitle className="text-lg">{isEditing ? "Editar Pregunta" : "Nueva Pregunta"}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Campo 'text' para todos los tipos de pregunta, al inicio del formulario */}
+        <div>
+          <label className="text-sm font-medium block mb-2">Texto de la pregunta</label>
+          <input
+            type="text"
+            value={formData.text || ""}
+            onChange={(e) => setFormData({ ...formData, text: e.target.value })}
+            className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="Ingresa el texto de la pregunta"
+          />
+        </div>
         {(gameType === "image-word" || gameType === "rhyme") && (
           <>
-            <div>
-              <label className="text-sm font-medium block mb-2">
-                {gameType === "image-word" ? "¿Qué palabra está en la imagen?" : "Palabra principal para rimas"}
-              </label>
-              <input
-                type="text"
-                value={formData.text || formData.mainWord || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, [gameType === "image-word" ? "text" : "mainWord"]: e.target.value })
-                }
-                className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                placeholder="Ingresa la palabra"
-              />
-            </div>
+            {/* ...existing code... */}
+          </>
+        )}
             <div>
               <label className="text-sm font-medium block mb-2">Respuesta Correcta</label>
               <input

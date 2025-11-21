@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 
 import { palette, withAlpha } from '@/theme/colors';
 import { formatSeconds } from '@/utils/time';
@@ -169,12 +170,14 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
   return (
     <ScrollView contentContainerStyle={[styles.wrapper, { backgroundColor: theme.container }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onExit} style={styles.backButton} accessibilityRole="button">
-          <Text style={[styles.backText, { color: theme.accent }]}>← Salir</Text>
-        </TouchableOpacity>
+        {/* Exit button removed */}
+        <View style={{ flex: 1 }} />
         <View style={styles.headerInfo}>
-          <Text style={styles.timerLabel}>Tiempo restante</Text>
-          <Text style={[styles.timerValue, { color: theme.accent }]}>{formatSeconds(timeRemaining)}</Text>
+          {/* Time remaining label removed */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="clock" size={20} color={theme.accent} />
+            <Text style={[styles.timerValue, { color: theme.accent }]}>{formatSeconds(timeRemaining)}</Text>
+          </View>
         </View>
       </View>
 
@@ -182,14 +185,15 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
         <View style={styles.metaTop}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.metaTitle, { color: theme.onAccent }]}>Conteo de Sílabas</Text>
-            <Text style={[styles.metaSubtitle, { color: withAlpha(theme.onAccent, 0.85) }]}>
-              Pregunta {questionIndex + 1} de {totalQuestions}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="star" size={16} color={withAlpha(theme.onAccent, 0.85)} />
+              <Text style={[styles.metaSubtitle, { color: withAlpha(theme.onAccent, 0.85) }]}>
+                Pregunta {questionIndex + 1} de {totalQuestions}
+              </Text>
+            </View>
           </View>
           <View style={styles.metaBadges}>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{formatSeconds(timeRemaining)}</Text>
-            </View>
+            {/* Badges updated */}
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
                 {stats.correct}/{totalQuestions}
@@ -202,7 +206,7 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
             )}
           </View>
         </View>
-        <View style={[styles.metaProgress, { backgroundColor: withAlpha(theme.onAccent, 0.25) }]}>
+        <View style={[styles.metaProgress, { backgroundColor: '#FFFFFF' }]}>
           <View style={[styles.metaProgressFill, { width: `${progress}%` }]} />
         </View>
       </View>
@@ -290,9 +294,8 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
               ? stats.streak >= 3
                 ? `¡INCREÍBLE RACHA! Llevas ${stats.streak} respuestas correctas.`
                 : '¡Muy bien! Contaste correctamente las sílabas.'
-              : `La palabra tiene ${currentQuestion.correctCount} ${
-                  currentQuestion.correctCount === 1 ? 'sílaba' : 'sílabas'
-                }.`}
+              : `La palabra tiene ${currentQuestion.correctCount} ${currentQuestion.correctCount === 1 ? 'sílaba' : 'sílabas'
+              }.`}
           </Text>
           {showSyllables && (
             <Text style={styles.feedbackTextMuted}>

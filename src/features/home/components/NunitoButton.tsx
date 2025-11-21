@@ -32,11 +32,14 @@ export default function NunitoButton({
     >
       <TouchableOpacity
         accessibilityRole="button"
-        activeOpacity={0.8}
+        activeOpacity={0.7}
         onPress={onPress}
         disabled={disabled}
-        className={`min-h-10 w-full self-stretch rounded-lg px-4 py-2 flex-row items-center justify-center gap-2 shadow-sm bg-primary ${disabled ? "opacity-60" : "opacity-100"}`}
-        style={contentStyle}
+        className={`min-h-10 w-full self-stretch rounded-lg px-4 py-2 flex-row items-center justify-center gap-2 shadow-md bg-primary border border-primary/20 ${disabled ? "opacity-60" : "opacity-100"}`}
+        style={[
+          { elevation: 4 }, // Android shadow
+          contentStyle
+        ]}
       >
         {children}
       </TouchableOpacity>

@@ -9,7 +9,9 @@ export interface RoomSummaryCardProps {
   students: number;
   average: number;
   completion: number;
+  code?: string;
   onPressDetails?: () => void;
+  onStartActivity?: () => void;
 }
 
 export default function RoomSummaryCard({
@@ -19,7 +21,9 @@ export default function RoomSummaryCard({
   students,
   average,
   completion,
+  code,
   onPressDetails,
+  onStartActivity,
 }: RoomSummaryCardProps) {
   return (
     <Pressable
@@ -30,6 +34,14 @@ export default function RoomSummaryCard({
         <View className="flex-1 gap-1">
           <Text className="text-lg font-semibold text-text">{title}</Text>
           <Text className="text-sm text-muted">{dateTime}</Text>
+          {code && (
+            <View className="flex-row items-center gap-2 mt-1">
+              <Text className="text-xs font-bold text-muted uppercase tracking-wider">CÓDIGO:</Text>
+              <View className="bg-surfaceMuted px-2 py-0.5 rounded border border-border/50">
+                <Text className="text-sm font-mono font-bold text-primary">{code}</Text>
+              </View>
+            </View>
+          )}
         </View>
         <View className="px-2.5 py-1 rounded-lg bg-[#4A635F]">
           <Text className="text-xs text-white font-medium">{gameLabel}</Text>
@@ -59,14 +71,24 @@ export default function RoomSummaryCard({
         </View>
       </View>
 
-      {onPressDetails && (
-        <TouchableOpacity
-          className="h-9 rounded-lg border border-border bg-surfaceMuted items-center justify-center"
-          onPress={onPressDetails}
-        >
-          <Text className="text-sm font-medium text-text">Ver detalles</Text>
-        </TouchableOpacity>
-      )}
+      <View className="flex-row gap-3">
+        {onStartActivity && (
+          <TouchableOpacity
+            className="flex-1 h-10 rounded-lg bg-primary items-center justify-center shadow-sm active:opacity-90"
+            onPress={onStartActivity}
+          >
+            <Text className="text-sm font-bold text-primaryOn">Iniciar actividad</Text>
+          </TouchableOpacity>
+        )}
+        {onPressDetails && (
+          <TouchableOpacity
+            className={`h-10 rounded-lg border border-border bg-surfaceMuted items-center justify-center ${onStartActivity ? "px-4" : "flex-1"}`}
+            onPress={onPressDetails}
+          >
+            <Text className="text-sm font-medium text-text">Ver detalles</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </Pressable>
   );
 }

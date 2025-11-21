@@ -1,73 +1,80 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Pressable,
     ScrollView,
     Text,
     TextInput,
     View,
+    ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
 import NunitoButton from "@/features/home/components/NunitoButton";
 import TeacherSectionCard from "@/features/home/components/teacher/TeacherSectionCard";
 import { palette } from "@/theme/colors";
-
-export interface Course {
-    id: string;
-    name: string;
-    description: string;
-    createdAt: string;
-    testSuites: number;
-}
+import { useCourses } from "@/services/useCourses";
+import { useNotification } from "@/contexts/NotificationContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CourseManagerProps {
     onSelectCourse?: (courseId: string | undefined) => void;
 }
 
+
+
 export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
-    const [courses, setCourses] = useState<Course[]>([
-        {
-            id: "1",
-            name: "Español 3A",
-            description: "Curso de lenguaje para 3er año básico",
-            createdAt: "2024-01-15",
-            testSuites: 3,
-        },
-        {
-            id: "2",
-            name: "Español 4B",
-            description: "Curso de lenguaje para 4to año básico",
-            createdAt: "2024-01-10",
-            testSuites: 2,
-        },
-    ]);
+    const {
+        courses,
+        loading,
+        error,
+        fetchCourses,
+        createCourse,
+        deleteCourse
+    } = useCourses();
+    const { error: showError, success: showSuccess } = useNotification();
 
     const [isCreating, setIsCreating] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
     const [newCourseName, setNewCourseName] = useState("");
     const [newCourseDesc, setNewCourseDesc] = useState("");
 
-    const handleCreateCourse = () => {
-        if (newCourseName.trim()) {
-            const newCourse: Course = {
-                id: Date.now().toString(),
-                name: newCourseName,
-                description: newCourseDesc,
-                createdAt: new Date().toISOString().split("T")[0],
-                testSuites: 0,
-            };
-            setCourses([...courses, newCourse]);
-            setNewCourseName("");
-            setNewCourseDesc("");
-            setIsCreating(false);
+    const { user } = useAuth();
+    useEffect(() => {
+        if (user && user.id) {
+            console.log('Fetching courses for teacher ID:', user.id);
+            fetchCourses(user.id);
+        }
+    }, [fetchCourses, user]);
+
+    const handleCreateCourse = async () => {
+        if (newCourseName.trim() && user?.id) {
+            try {
+                await createCourse({
+                    name: newCourseName,
+                    description: newCourseDesc,
+                    teacherId: user.id,
+                });
+                setNewCourseName("");
+                setNewCourseDesc("");
+                setIsCreating(false);
+                showSuccess("Curso creado exitosamente");
+            } catch (e) {
+                showError("No se pudo crear el curso");
+            }
         }
     };
 
-    const handleDeleteCourse = (id: string) => {
-        setCourses(courses.filter((c) => c.id !== id));
-        if (selectedCourse === id) {
-            setSelectedCourse(null);
-            onSelectCourse?.(undefined);
+    const handleDeleteCourse = async (id: string) => {
+        // For now, we'll delete directly. In the future, we could add a confirmation modal
+        try {
+            await deleteCourse(id);
+            if (selectedCourse === id) {
+                setSelectedCourse(null);
+                onSelectCourse?.(undefined);
+            }
+            showSuccess("Curso eliminado exitosamente");
+        } catch (e) {
+            showError("No se pudo eliminar el curso");
         }
     };
 
@@ -94,6 +101,7 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
                     <Pressable
                         className="flex-row items-center gap-2 bg-primary px-4 py-2.5 rounded-xl active:scale-95"
                         onPress={() => setIsCreating(true)}
+                        disabled={loading}
                     >
                         <Feather name="plus" size={18} color={palette.primaryOn} />
                         <Text className="text-sm font-semibold text-primaryOn">
@@ -101,6 +109,13 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
                         </Text>
                     </Pressable>
                 </View>
+
+                {/* Error Message */}
+                {error && (
+                    <View className="bg-error/10 p-3 rounded-lg">
+                        <Text className="text-error text-sm">{error}</Text>
+                    </View>
+                )}
 
                 {/* Create Course Form */}
                 {isCreating && (
@@ -118,6 +133,7 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
                                 onChangeText={setNewCourseName}
                                 placeholder="Ej: Español 3A"
                                 placeholderTextColor={palette.muted}
+                                editable={!loading}
                             />
                         </View>
                         <View className="gap-2">
@@ -132,20 +148,26 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
                                 placeholderTextColor={palette.muted}
                                 multiline
                                 numberOfLines={2}
+                                editable={!loading}
                             />
                         </View>
                         <View className="flex-row gap-3">
                             <View className="flex-1">
-                                <NunitoButton onPress={handleCreateCourse}>
-                                    <Text className="text-base font-bold text-primaryOn">
-                                        Crear Curso
-                                    </Text>
+                                <NunitoButton onPress={handleCreateCourse} disabled={loading}>
+                                    {loading ? (
+                                        <ActivityIndicator color={palette.primaryOn} />
+                                    ) : (
+                                        <Text className="text-base font-bold text-primaryOn">
+                                            Crear Curso
+                                        </Text>
+                                    )}
                                 </NunitoButton>
                             </View>
                             <View className="flex-1">
                                 <NunitoButton
                                     onPress={() => setIsCreating(false)}
                                     contentStyle={{ backgroundColor: palette.surface }}
+                                    disabled={loading}
                                 >
                                     <Text className="text-base font-semibold text-text">
                                         Cancelar
@@ -158,7 +180,9 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
 
                 {/* Courses List */}
                 <View className="gap-3">
-                    {courses.length === 0 ? (
+                    {loading && !isCreating ? (
+                        <ActivityIndicator size="large" color={palette.primary} />
+                    ) : courses.length === 0 ? (
                         <View className="items-center py-12 gap-4">
                             <Feather name="book-open" size={64} color={palette.muted} />
                             <Text className="text-muted text-center">
@@ -171,8 +195,8 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
                                 <View
                                     key={course.id}
                                     className={`p-4 border rounded-xl ${selectedCourse === course.id
-                                            ? "bg-primary/10 border-primary"
-                                            : "border-border bg-surface"
+                                        ? "bg-primary/10 border-primary"
+                                        : "border-border bg-surface"
                                         }`}
                                 >
                                     <View className="flex-row items-center justify-between">
@@ -181,17 +205,17 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
                                                 {course.name}
                                             </Text>
                                             <Text className="text-sm text-muted">
-                                                {course.description}
+                                                {course.description || "Sin descripción"}
                                             </Text>
                                             <Text className="text-xs text-primary mt-2">
-                                                {course.testSuites} conjunto
-                                                {course.testSuites !== 1 ? "s" : ""} de preguntas
+                                                Ver detalles
                                             </Text>
                                         </View>
                                         <View className="flex-row gap-2">
                                             <Pressable
                                                 className="p-2 rounded-lg border border-primary bg-primary/10 active:bg-primary/20"
                                                 onPress={() => handleSelectCourse(course.id)}
+                                                disabled={loading}
                                             >
                                                 <Feather name="edit-2" size={16} color={palette.primary} />
                                             </Pressable>
