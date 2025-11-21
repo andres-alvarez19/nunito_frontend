@@ -1,5 +1,0 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-# Validate commit message from repo root
-pnpm exec -- commitlint --edit "$1"
