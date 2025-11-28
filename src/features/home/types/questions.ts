@@ -50,6 +50,7 @@ export interface AudioQuestion extends BaseQuestion {
     type: "audio-recognition";
     text?: string;
     options?: {
+        word?: string;
         audioUrl: string;
         alternatives: string[];
         hint?: string;

@@ -14,29 +14,16 @@ import TeacherSectionCard from "@/features/home/components/teacher/TeacherSectio
 import { palette, withAlpha } from "@/theme/colors";
 import { useCourses } from "@/services/useCourses";
 import { useTestSuites } from "@/services/useTestSuites";
+import { createRoom } from "@/services/useRooms";
 import { useAuth } from "@/contexts/AuthContext";
+
+import { Room } from "@/features/home/types";
 
 export interface RoomConfig {
     name: string;
     games: string[];
     difficulty: string;
     duration: number;
-}
-
-export interface Room {
-    id: string;
-    code: string;
-    name: string;
-    games: string[];
-    difficulty: string;
-    duration: number;
-    testSuiteId: string;
-    teacher: {
-        name: string;
-        email: string;
-    };
-    students: string[];
-    isActive: boolean;
 }
 
 interface RoomCreationFlowProps {
@@ -131,32 +118,38 @@ export default function RoomCreationFlow({
         setStep(3);
     };
 
-    const handleCreateRoom = () => {
-        if (!selectedTestSuite) return;
+    const handleCreateRoom = async () => {
+        if (!selectedTestSuite || !user?.id) return;
 
         setIsCreating(true);
 
-        // Simulate API call
-        setTimeout(() => {
-            const newRoom: Room = {
-                id: Date.now().toString(),
-                code: generateRoomCode(),
+        try {
+            // Ensure duration is a valid number
+            const duration = typeof roomConfig.duration === 'number' && roomConfig.duration > 0
+                ? roomConfig.duration
+                : 10;
+
+            const newRoom = await createRoom({
+                teacherId: user.id,
                 name: roomConfig.name,
                 games: roomConfig.games,
                 difficulty: roomConfig.difficulty,
-                duration: roomConfig.duration,
+                durationMinutes: duration,
                 testSuiteId: selectedTestSuite,
-                teacher: {
-                    name: teacherName,
-                    email: teacherEmail,
-                },
-                students: [],
-                isActive: false,
+            });
+
+            const roomWithGames = {
+                ...newRoom,
+                games: roomConfig.games
             };
 
-            onRoomCreated(newRoom);
+            onRoomCreated(roomWithGames);
+        } catch (error) {
+            console.error("Error creating room:", error);
+            // TODO: Show error toast
+        } finally {
             setIsCreating(false);
-        }, 1000);
+        }
     };
 
     const isStep2Valid =
@@ -201,8 +194,8 @@ export default function RoomCreationFlow({
                             <Pressable
                                 key={course.id}
                                 className={`p-4 rounded-xl border-2 active:scale-[0.98] ${selectedCourseId === course.id
-                                        ? "bg-primary/10 border-primary"
-                                        : "border-border bg-surface"
+                                    ? "bg-primary/10 border-primary"
+                                    : "border-border bg-surface"
                                     }`}
                                 onPress={() => setSelectedCourseId(course.id)}
                             >
@@ -210,8 +203,8 @@ export default function RoomCreationFlow({
                                     <View className="flex-1">
                                         <Text
                                             className={`text-lg font-bold ${selectedCourseId === course.id
-                                                    ? "text-primary"
-                                                    : "text-text"
+                                                ? "text-primary"
+                                                : "text-text"
                                                 }`}
                                         >
                                             {course.name}
@@ -317,8 +310,8 @@ export default function RoomCreationFlow({
                                 <Pressable
                                     key={game.id}
                                     className={`flex-row items-center gap-3 p-3 rounded-xl border ${roomConfig.games.includes(game.id)
-                                            ? "bg-primary/10 border-primary"
-                                            : "border-border bg-surface"
+                                        ? "bg-primary/10 border-primary"
+                                        : "border-border bg-surface"
                                         }`}
                                     onPress={() => toggleGameSelection(game.id)}
                                 >
@@ -339,8 +332,8 @@ export default function RoomCreationFlow({
                                     </View>
                                     <Text
                                         className={`flex-1 text-base font-semibold ${roomConfig.games.includes(game.id)
-                                                ? "text-primary"
-                                                : "text-text"
+                                            ? "text-primary"
+                                            : "text-text"
                                             }`}
                                     >
                                         {game.name}
@@ -360,8 +353,8 @@ export default function RoomCreationFlow({
                                     <Pressable
                                         key={diff.value}
                                         className={`p-2.5 rounded-xl border ${roomConfig.difficulty === diff.value
-                                                ? "bg-primary/10 border-primary"
-                                                : "border-border bg-surface"
+                                            ? "bg-primary/10 border-primary"
+                                            : "border-border bg-surface"
                                             }`}
                                         onPress={() =>
                                             setRoomConfig({ ...roomConfig, difficulty: diff.value })
@@ -369,8 +362,8 @@ export default function RoomCreationFlow({
                                     >
                                         <Text
                                             className={`text-sm font-medium text-center ${roomConfig.difficulty === diff.value
-                                                    ? "text-primary"
-                                                    : "text-text"
+                                                ? "text-primary"
+                                                : "text-text"
                                                 }`}
                                         >
                                             {diff.label}
@@ -388,8 +381,8 @@ export default function RoomCreationFlow({
                                     <Pressable
                                         key={dur.value}
                                         className={`p-2.5 rounded-xl border ${roomConfig.duration === dur.value
-                                                ? "bg-primary/10 border-primary"
-                                                : "border-border bg-surface"
+                                            ? "bg-primary/10 border-primary"
+                                            : "border-border bg-surface"
                                             }`}
                                         onPress={() =>
                                             setRoomConfig({ ...roomConfig, duration: dur.value })
@@ -397,8 +390,8 @@ export default function RoomCreationFlow({
                                     >
                                         <Text
                                             className={`text-sm font-medium text-center ${roomConfig.duration === dur.value
-                                                    ? "text-primary"
-                                                    : "text-text"
+                                                ? "text-primary"
+                                                : "text-text"
                                                 }`}
                                         >
                                             {dur.label}
@@ -527,8 +520,8 @@ export default function RoomCreationFlow({
                         <Pressable
                             key={suite.id}
                             className={`p-4 rounded-xl border-2 active:scale-[0.98] ${selectedTestSuite === suite.id
-                                    ? "bg-primary/10 border-primary"
-                                    : "border-border bg-surface"
+                                ? "bg-primary/10 border-primary"
+                                : "border-border bg-surface"
                                 }`}
                             onPress={() => setSelectedTestSuite(suite.id)}
                         >
@@ -536,8 +529,8 @@ export default function RoomCreationFlow({
                                 <View className="flex-1">
                                     <Text
                                         className={`text-lg font-bold ${selectedTestSuite === suite.id
-                                                ? "text-primary"
-                                                : "text-text"
+                                            ? "text-primary"
+                                            : "text-text"
                                             }`}
                                     >
                                         {suite.name}

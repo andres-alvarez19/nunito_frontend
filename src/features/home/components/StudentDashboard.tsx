@@ -4,15 +4,20 @@ import { Platform, ScrollView, Text, TouchableOpacity, View } from "react-native
 import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 import { formatSeconds } from "@/utils/time";
+import { UserDto, RoomStatus, ConnectionStatus } from "@/hooks/useRoomSocket";
 
 interface StudentDashboardProps {
   studentName: string;
+  studentId: string;
   roomCode: string;
+  roomId: string;
+  teacherId?: string;
   onStartGame: (gameId: string) => void;
   onLeaveRoom: () => void;
+  connectedUsers: UserDto[];
+  roomStatus: RoomStatus;
+  connectionStatus?: ConnectionStatus;
 }
-
-const connectedStudentsMock = ["Ana", "Carlos", "María"];
 
 const MOTIVATION_CARDS = [
   {
@@ -38,19 +43,29 @@ const GAME_INSTRUCTIONS = [
 
 export default function StudentDashboard({
   studentName,
+  studentId,
   roomCode,
+  roomId,
+  teacherId,
   onStartGame,
   onLeaveRoom,
+  connectedUsers,
+  roomStatus,
 }: StudentDashboardProps) {
   const totalTime = 600;
   const [isWaiting, setIsWaiting] = useState(true);
   const [timeRemaining, setTimeRemaining] = useState(totalTime);
   const [isActive, setIsActive] = useState(false);
 
+  // WebSocket Integration is now handled by parent (HomeScreen)
+
+  // Use real-time users list
   const studentList = useMemo(() => {
-    const others = connectedStudentsMock.filter((name) => name !== studentName);
-    return [studentName, ...others];
-  }, [studentName]);
+    // Map UserDto to string names for display, filtering out the teacher
+    return connectedUsers
+      .filter(u => !teacherId || u.userId !== teacherId)
+      .map(u => u.name);
+  }, [connectedUsers, teacherId]);
 
   const totalStudents = studentList.length;
   const progress = useMemo(
@@ -61,13 +76,14 @@ export default function StudentDashboard({
   const avatarInitial = studentName.charAt(0).toUpperCase();
 
   useEffect(() => {
-    const joinTimer = setTimeout(() => {
+    if (roomStatus === 'STARTED') {
       setIsWaiting(false);
       setIsActive(true);
-    }, 4000);
-
-    return () => clearTimeout(joinTimer);
-  }, []);
+    } else {
+      setIsWaiting(true);
+      setIsActive(false);
+    }
+  }, [roomStatus]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -152,9 +168,9 @@ export default function StudentDashboard({
             </Text>
           </View>
           <View className="flex-row flex-wrap gap-3">
-            {studentList.map((student) => (
+            {studentList.map((student, index) => (
               <View
-                key={student}
+                key={`${student}-${index}`}
                 className="flex-row items-center gap-2 rounded-xl px-3.5 py-2.5 border flex-1"
                 style={{
                   minWidth: "45%",

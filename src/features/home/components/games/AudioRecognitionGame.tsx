@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
 
 import NunitoButton from '@/features/home/components/NunitoButton';
 import { palette, withAlpha } from '@/theme/colors';
@@ -78,7 +80,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, onGameComplete }: GameComponentProps) {
+export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, onGameComplete, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.blueContainer,
@@ -87,7 +89,28 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
     }),
     []
   );
-  const questions = useMemo(() => questionBank[difficulty] ?? questionBank.easy, [difficulty]);
+
+  const questions = useMemo(() => {
+    if (fetchedQuestions && fetchedQuestions.length > 0) {
+      return fetchedQuestions
+        .filter(q => q.type === 'audio-recognition')
+        .map((q, index) => {
+          if (q.type !== 'audio-recognition') return null;
+          const targetWord = q.options.word || "Palabra";
+          const audioSource = q.options.audioUrl || targetWord;
+          const allOptions = [targetWord, ...q.options.alternatives].sort(() => Math.random() - 0.5);
+
+          return {
+            id: parseInt(q.id) || index + 1,
+            audioWord: audioSource,
+            options: allOptions,
+            correctAnswer: targetWord,
+          };
+        })
+        .filter((q): q is AudioQuestion => q !== null);
+    }
+    return questionBank[difficulty] ?? questionBank.easy;
+  }, [difficulty, fetchedQuestions]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -208,7 +231,7 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
     }
   };
 
-  const speakWord = () => {
+  const speakWord = async () => {
     setHasPlayedAudio(true);
     setPlayCount((prev) => prev + 1);
     setIsPlaying(true);
@@ -217,10 +240,65 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
       clearTimeout(playbackTimeoutRef.current);
     }
 
-    playbackTimeoutRef.current = setTimeout(() => {
+    try {
+      // Ensure audio plays even in silent mode
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+      });
+      console.log("Audio mode set for game playback");
+
+      console.log("speakWord called for:", currentQuestion.audioWord);
+      if (currentQuestion.audioWord.startsWith('tts:')) {
+        const textToSpeak = currentQuestion.audioWord.replace('tts:', '');
+        console.log("Speaking TTS:", textToSpeak);
+        Speech.speak(textToSpeak, {
+          language: 'es',
+          onStart: () => console.log("Game TTS Started"),
+          onDone: () => {
+            console.log("Game TTS Done");
+            setIsPlaying(false);
+          },
+          onStopped: () => {
+            console.log("Game TTS Stopped");
+            setIsPlaying(false);
+          },
+          onError: (e) => {
+            console.error("Game TTS Error:", e);
+            setIsPlaying(false);
+          }
+        });
+      } else {
+        // Assume it's a URL or a simple word (fallback to TTS for simple word if not URL)
+        // For now, if it looks like a URL, play it. If not, TTS it.
+        if (currentQuestion.audioWord.startsWith('http')) {
+          console.log("Playing Audio URL:", currentQuestion.audioWord);
+          const { sound } = await Audio.Sound.createAsync({ uri: currentQuestion.audioWord });
+          await sound.playAsync();
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              console.log("Audio URL Finished");
+              setIsPlaying(false);
+            }
+          });
+        } else {
+          // Fallback for existing mock data which are just words
+          console.log("Fallback TTS for word:", currentQuestion.audioWord);
+          Speech.speak(currentQuestion.audioWord, {
+            language: 'es',
+            onStart: () => console.log("Fallback TTS Started"),
+            onDone: () => {
+              console.log("Fallback TTS Done");
+              setIsPlaying(false);
+            },
+            onStopped: () => setIsPlaying(false),
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error playing audio in game", error);
       setIsPlaying(false);
-      playbackTimeoutRef.current = null;
-    }, 1600);
+    }
   };
 
   const stopWord = () => {
@@ -228,6 +306,9 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
       clearTimeout(playbackTimeoutRef.current);
       playbackTimeoutRef.current = null;
     }
+    Speech.stop();
+    // Note: stopping expo-av sound is harder without keeping a ref to the sound object.
+    // For this simple implementation, we might just stop Speech.
     setIsPlaying(false);
   };
 

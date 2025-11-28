@@ -9,6 +9,7 @@ import { RoomSummaryItem } from "@/features/home/types";
 
 interface MyRoomsProps {
     activeRooms: RoomSummaryItem[];
+    pendingRooms: RoomSummaryItem[];
     pastRooms: RoomSummaryItem[];
     onNavigateToRoom: (room: RoomSummaryItem) => void;
     onCreateRoom: () => void;
@@ -17,6 +18,7 @@ interface MyRoomsProps {
 
 export default function MyRooms({
     activeRooms,
+    pendingRooms,
     pastRooms,
     onNavigateToRoom,
     onCreateRoom,
@@ -36,6 +38,30 @@ export default function MyRooms({
                     </Text>
                 </Pressable>
             </View>
+
+            <Text className="mb-1 text-base font-semibold text-text">Salas pendientes</Text>
+            <View className="flex-row flex-wrap gap-4 mb-4">
+                {pendingRooms.length > 0 ? (
+                    pendingRooms.map((room) => (
+                        <RoomSummaryCard
+                            key={room.id}
+                            title={room.title}
+                            gameLabel={room.gameLabel}
+                            dateTime={room.dateTime}
+                            students={room.students}
+                            average={room.average}
+                            completion={room.completion}
+                            code={room.code}
+                            onPressDetails={() => onNavigateToRoom(room)}
+                            onStartActivity={() => onStartActivity(room.id)}
+                        />
+                    ))
+                ) : (
+                    <Text className="text-muted italic mb-2">No hay salas pendientes</Text>
+                )}
+            </View>
+
+            <Text className="mb-1 text-base font-semibold text-text">Salas activas</Text>
             <View className="flex-row flex-wrap gap-4">
                 {activeRooms.length > 0 ? (
                     activeRooms.map((room) => (
@@ -77,6 +103,6 @@ export default function MyRooms({
                     <Text className="text-muted italic">No hay salas anteriores</Text>
                 )}
             </View>
-        </TeacherSectionCard>
+        </TeacherSectionCard >
     );
 }

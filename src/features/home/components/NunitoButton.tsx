@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import type { StyleProp, ViewStyle } from "react-native";
-import { TouchableOpacity, View } from "react-native";
+import { StyleProp, ViewStyle, View, Pressable } from "react-native";
 
 import { palette } from "@/theme/colors";
 
@@ -30,19 +29,18 @@ export default function NunitoButton({
       className="w-full rounded-xl p-1.5 justify-center items-stretch bg-surfaceMuted"
       style={style}
     >
-      <TouchableOpacity
+      <Pressable
         accessibilityRole="button"
-        activeOpacity={0.7}
         onPress={onPress}
         disabled={disabled}
-        className={`min-h-10 w-full self-stretch rounded-lg px-4 py-2 flex-row items-center justify-center gap-2 shadow-md bg-primary border border-primary/20 ${disabled ? "opacity-60" : "opacity-100"}`}
+        className={`min-h-10 w-full self-stretch rounded-lg px-4 py-2 flex-row items-center justify-center gap-2 shadow-md bg-primary border border-primary/20 ${disabled ? "opacity-60" : "opacity-100"} active:opacity-70`}
         style={[
           { elevation: 4 }, // Android shadow
           contentStyle
         ]}
       >
         {children}
-      </TouchableOpacity>
+      </Pressable>
     </View>
   );
 }

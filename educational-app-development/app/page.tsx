@@ -74,9 +74,31 @@ export default function HomePage() {
     setAppState("room-dashboard")
   }
 
-  const handleStudentJoin = () => {
-    if (studentName.trim() && roomCode.trim()) {
-      setAppState("student-dashboard")
+  const handleStudentJoin = async () => {
+    if (!studentName.trim() || !roomCode.trim()) return;
+    try {
+      // 1. Buscar la sala por código
+      const resRoom = await fetch(`http://localhost:3001/api/rooms/code/${roomCode.trim()}`);
+      if (!resRoom.ok) {
+        alert("No se encontró la sala. Revisa el código e inténtalo de nuevo.");
+        return;
+      }
+      const room = await resRoom.json();
+      // 2. Agregar el estudiante a la sala
+      const resStudent = await fetch(`http://localhost:3001/api/rooms/${room.id}/students`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentName: studentName.trim() })
+      });
+      if (!resStudent.ok) {
+        alert("No se pudo agregar el estudiante a la sala.");
+        return;
+      }
+      const updatedRoom = await resStudent.json();
+      setCurrentRoom(updatedRoom);
+      setAppState("student-dashboard");
+    } catch (error) {
+      alert("Error de red. Intenta nuevamente más tarde.");
     }
   }
 

@@ -45,18 +45,18 @@ export default function GameQuestionEditor({
         }
     }, [testSuiteId, gameType, fetchQuestions]);
 
-    const handleAddQuestion = async (formData: Partial<Question>) => {
+    const handleAddQuestion = async (formData: any) => {
         try {
             // Construir el payload para que difficulty solo esté dentro de options
             const { difficulty, ...rest } = formData;
             const requestData = {
                 ...rest,
                 type: gameType,
+                testSuiteId,
                 options: {
                     ...formData.options,
                     difficulty: difficulty || "easy",
                 },
-                testSuiteId,
             } as CreateQuestionRequest;
 
             await createQuestion(testSuiteId, requestData);
@@ -79,6 +79,7 @@ export default function GameQuestionEditor({
                 const requestData = {
                     ...formData,
                     type: gameType,
+                    testSuiteId,
                 } as CreateQuestionRequest;
 
                 await updateQuestion(editingQuestion.id, requestData);
@@ -106,7 +107,7 @@ export default function GameQuestionEditor({
         setEditingQuestion(undefined);
     };
 
-    const getDifficultyColor = (difficulty: string) => {
+    const getDifficultyColor = (difficulty?: string) => {
         switch (difficulty) {
             case "easy":
                 return palette.mint;
@@ -119,7 +120,7 @@ export default function GameQuestionEditor({
         }
     };
 
-    const getDifficultyLabel = (difficulty: string) => {
+    const getDifficultyLabel = (difficulty?: string) => {
         switch (difficulty) {
             case "easy":
                 return "Fácil";
@@ -128,35 +129,35 @@ export default function GameQuestionEditor({
             case "hard":
                 return "Difícil";
             default:
-                return difficulty;
+                return difficulty || "-";
         }
     };
 
     const getQuestionText = (question: Question) => {
         switch (question.type) {
             case "image-word":
-                return question.word;
+                return "¿A qué corresponde la imagen?";
             case "syllable-count":
-                return question.word;
+                return `¿Cuántas sílabas tiene "${question.options.word}"?`;
             case "rhyme-identification":
-                return question.mainWord;
+                return `¿Qué palabras riman con "${question.options.mainWord}"?`;
             case "audio-recognition":
-                return question.text;
+                return `Escucha y selecciona: "${question.options.word || question.text || '...'}"`;
             default:
-                return "Sin texto";
+                return "Pregunta sin título";
         }
     };
 
     const getCorrectAnswer = (question: Question) => {
         switch (question.type) {
             case "image-word":
-                return question.word;
+                return question.options.word;
             case "syllable-count":
-                return `${question.syllableCount} sílabas`;
+                return `${question.options.syllableCount} sílabas`;
             case "rhyme-identification":
-                return question.rhymingWords.join(", ");
+                return question.options.rhymingWords?.join(", ") ?? "";
             case "audio-recognition":
-                return question.text;
+                return question.options.word || question.text || "-";
             default:
                 return "-";
         }
@@ -223,9 +224,9 @@ export default function GameQuestionEditor({
                                         <Text className="text-sm text-muted">Dificultad:</Text>
                                         <Text
                                             className="text-sm font-semibold"
-                                            style={{ color: getDifficultyColor(question.difficulty) }}
+                                            style={{ color: getDifficultyColor(question.options.difficulty) }}
                                         >
-                                            {getDifficultyLabel(question.difficulty)}
+                                            {getDifficultyLabel(question.options.difficulty)}
                                         </Text>
                                     </View>
                                 </View>
@@ -256,6 +257,7 @@ export default function GameQuestionEditor({
                 isOpen={isModalOpen}
                 gameType={gameType}
                 question={editingQuestion}
+                testSuiteId={testSuiteId}
                 onSave={editingQuestion ? handleSaveEdit : handleAddQuestion}
                 onClose={handleCloseModal}
             />

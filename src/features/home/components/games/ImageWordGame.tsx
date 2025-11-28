@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { palette, withAlpha } from '@/theme/colors';
 import { formatSeconds } from '@/utils/time';
+import { API_CONFIG } from '@/config/api';
 
 import type { GameComponentProps } from './types';
 
@@ -102,7 +103,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameComplete }: GameComponentProps) {
+export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameComplete, onAnswer, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.mintContainer,
@@ -111,7 +112,32 @@ export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameCom
     }),
     []
   );
-  const questions = useMemo(() => questionBank[difficulty] ?? questionBank.easy, [difficulty]);
+
+  const questions = useMemo(() => {
+    if (fetchedQuestions && fetchedQuestions.length > 0) {
+      return fetchedQuestions
+        .filter(q => q.type === 'image-word')
+        .map((q, index) => {
+          // Type narrowing is needed here, but since we filtered, we can cast or access safely if TS is smart enough
+          // However, q is Question union.
+          if (q.type !== 'image-word') return null;
+
+          const imageUrl = q.options.imageUrl.startsWith('http')
+            ? q.options.imageUrl
+            : `${API_CONFIG.BASE_URL.replace('/api', '')}${q.options.imageUrl}`;
+
+          return {
+            id: parseInt(q.id) || index + 1,
+            image: { uri: imageUrl },
+            correctAnswer: q.options.word.toUpperCase(),
+            options: [q.options.word, ...q.options.alternatives].sort(() => Math.random() - 0.5).map(o => o.toUpperCase()),
+            hint: q.options.hint || "Sin pista disponible",
+          };
+        })
+        .filter((q): q is GameQuestion => q !== null);
+    }
+    return questionBank[difficulty] ?? questionBank.easy;
+  }, [difficulty, fetchedQuestions]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [showHint, setShowHint] = useState(false);
@@ -129,6 +155,18 @@ export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameCom
   });
 
   const currentQuestion = questions[questionIndex];
+
+  // Debug log for image
+  useEffect(() => {
+    if (currentQuestion) {
+      console.log('ImageWordGame - Current Question:', {
+        id: currentQuestion.id,
+        imageSource: currentQuestion.image,
+        correctAnswer: currentQuestion.correctAnswer
+      });
+    }
+  }, [currentQuestion]);
+
   const totalQuestions = questions.length;
   const progress = ((questionIndex + 1) / totalQuestions) * 100;
   const { width } = useWindowDimensions();
@@ -176,6 +214,16 @@ export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameCom
     setAnswerWasCorrect(wasCorrect);
     setShowFeedback(true);
 
+    if (onAnswer) {
+      onAnswer(
+        currentQuestion.id.toString(),
+        '¿Qué ves en la imagen?', // Or a more specific text if available
+        selectedAnswer || 'TIMEOUT',
+        wasCorrect,
+        responseTime * 1000
+      );
+    }
+
     setStats((prev) => {
       const nextStreak = wasCorrect ? prev.streak + 1 : 0;
       const nextStats: StatsState = {
@@ -212,6 +260,7 @@ export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameCom
   };
 
   const handleAnswerPress = (answer: string) => {
+    console.log('ImageWordGame - Answer pressed:', answer);
     if (showFeedback) return;
 
     setSelectedAnswer(answer);
@@ -270,7 +319,12 @@ export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameCom
         <View style={[styles.card, styles.columnCard, { borderColor: withAlpha(theme.accent, 0.18) }]}>
           <Text style={styles.prompt}>¿Qué ves en la imagen?</Text>
           <View style={styles.imageFrame}>
-            <Image source={currentQuestion.image} style={styles.image} resizeMode="contain" />
+            <Image
+              source={currentQuestion.image}
+              style={styles.image}
+              resizeMode="contain"
+              onError={(e) => console.error('ImageWordGame - Image Load Error:', e.nativeEvent.error)}
+            />
             {showFeedback && (
               <View style={styles.imageOverlay}>
                 <Text style={styles.overlayText}>{answerWasCorrect ? '✅' : '✖️'}</Text>

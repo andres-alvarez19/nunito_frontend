@@ -44,7 +44,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGameComplete }: GameComponentProps) {
+export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGameComplete, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.pastelContainer,
@@ -53,7 +53,24 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
     }),
     []
   );
-  const questions = useMemo(() => questionBank[difficulty] ?? questionBank.easy, [difficulty]);
+  const questions = useMemo(() => {
+    if (fetchedQuestions && fetchedQuestions.length > 0) {
+      return fetchedQuestions
+        .filter(q => q.type === 'syllable-count')
+        .map((q, index) => {
+          if (q.type !== 'syllable-count') return null;
+          return {
+            id: parseInt(q.id) || index + 1,
+            word: q.options.word.toUpperCase(),
+            syllables: q.options.syllableSeparation.split('-').map(s => s.toUpperCase()),
+            correctCount: q.options.syllableCount,
+            options: [q.options.syllableCount, ...q.options.alternatives].sort(() => Math.random() - 0.5),
+          };
+        })
+        .filter((q): q is SyllableQuestion => q !== null);
+    }
+    return questionBank[difficulty] ?? questionBank.easy;
+  }, [difficulty, fetchedQuestions]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);

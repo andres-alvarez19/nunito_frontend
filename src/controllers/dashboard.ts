@@ -19,7 +19,7 @@ export const dashboardController = {
         return response.json();
     },
 
-    getRoomsByStatus: async (teacherId: string, status: 'active' | 'past'): Promise<RoomSummaryItem[]> => {
+    getRoomsByStatus: async (teacherId: string, status: 'pending' | 'active' | 'finished'): Promise<RoomSummaryItem[]> => {
         const response = await fetch(`${API_CONFIG.BASE_URL}/teachers/${teacherId}/rooms?status=${status}`);
         if (!response.ok) {
             throw new Error(`Failed to fetch ${status} rooms`);

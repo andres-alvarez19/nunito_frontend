@@ -55,26 +55,39 @@ export function RoomCreation({ teacher, onRoomCreated, onBack }: RoomCreationPro
   }
 
   const handleCreateRoom = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsCreating(true)
+    e.preventDefault();
+    setIsCreating(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const newRoom: Room = {
-        id: Date.now().toString(),
-        code: generateRoomCode(),
-        name: roomData.name,
-        game: roomData.game,
-        difficulty: roomData.difficulty,
-        duration: roomData.duration,
-        teacher,
-        students: [],
-        isActive: false,
+    const roomCode = generateRoomCode();
+    const payload = {
+      code: roomCode,
+      name: roomData.name,
+      game: roomData.game,
+      difficulty: roomData.difficulty,
+      duration: roomData.duration,
+      teacher: { name: teacher.name, email: teacher.email },
+    };
+    console.log("[FRONTEND] Enviando datos al backend para crear sala:", payload);
+    try {
+      const response = await fetch("http://localhost:8080/api/rooms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      console.log("[FRONTEND] Solicitud enviada, esperando respuesta...");
+      if (!response.ok) {
+        console.error("[FRONTEND] Error al crear la sala. Status:", response.status);
+        setIsCreating(false);
+        return;
       }
-
-      onRoomCreated(newRoom)
-      setIsCreating(false)
-    }, 1000)
+      const newRoom = await response.json();
+      console.log("[FRONTEND] Respuesta recibida del backend:", newRoom);
+      onRoomCreated(newRoom);
+    } catch (error) {
+      console.error("[FRONTEND] Error en la solicitud de creación de sala:", error);
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   const selectedGame = games.find((g) => g.id === roomData.game)

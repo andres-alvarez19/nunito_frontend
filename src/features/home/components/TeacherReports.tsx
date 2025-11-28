@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -16,108 +16,17 @@ interface TeacherReportsProps {
   onBack: () => void;
 }
 
-interface StudentResult {
-  name: string;
-  gameId: string;
-  score: number;
-  correctAnswers: number;
-  totalQuestions: number;
-  averageTime: number;
-  completedAt: string;
-}
+// Interface definitions removed as they are imported or not needed locally if using imported types
+// But we need to keep them if they are not exported from useReports or types
+// Actually useReports exports RoomReport, but we need to remove local definition to avoid conflict
+// or just rely on imports.
+// Let's remove local interfaces that collide.
 
-interface RoomReport {
-  roomId: string;
-  roomName: string;
-  gameId: string;
-  difficulty: string;
-  studentsCount: number;
-  averageScore: number;
-  completionRate: number;
-  createdAt: string;
-  students: StudentResult[];
-}
+import { useReports, RoomReport } from "@/services/useReports";
+import { useAuth } from "@/contexts/AuthContext";
+import { ActivityIndicator } from "react-native";
 
-const mockReports: RoomReport[] = [
-  {
-    roomId: "1",
-    roomName: "Clase 3°A - Fonología",
-    gameId: "image-word",
-    difficulty: "easy",
-    studentsCount: 8,
-    averageScore: 85,
-    completionRate: 100,
-    createdAt: "2024-01-15T10:30:00Z",
-    students: [
-      {
-        name: "Ana García",
-        gameId: "image-word",
-        score: 95,
-        correctAnswers: 19,
-        totalQuestions: 20,
-        averageTime: 8.5,
-        completedAt: "2024-01-15T10:45:00Z",
-      },
-      {
-        name: "Carlos López",
-        gameId: "image-word",
-        score: 80,
-        correctAnswers: 16,
-        totalQuestions: 20,
-        averageTime: 12.3,
-        completedAt: "2024-01-15T10:47:00Z",
-      },
-      {
-        name: "María Rodríguez",
-        gameId: "image-word",
-        score: 90,
-        correctAnswers: 18,
-        totalQuestions: 20,
-        averageTime: 9.8,
-        completedAt: "2024-01-15T10:46:00Z",
-      },
-      {
-        name: "Diego Martínez",
-        gameId: "image-word",
-        score: 75,
-        correctAnswers: 15,
-        totalQuestions: 20,
-        averageTime: 15.2,
-        completedAt: "2024-01-15T10:48:00Z",
-      },
-    ],
-  },
-  {
-    roomId: "2",
-    roomName: "Clase 2°B - Sílabas",
-    gameId: "syllable-count",
-    difficulty: "medium",
-    studentsCount: 6,
-    averageScore: 78,
-    completionRate: 83,
-    createdAt: "2024-01-14T14:15:00Z",
-    students: [
-      {
-        name: "Sofía Hernández",
-        gameId: "syllable-count",
-        score: 85,
-        correctAnswers: 17,
-        totalQuestions: 20,
-        averageTime: 11.2,
-        completedAt: "2024-01-14T14:30:00Z",
-      },
-      {
-        name: "Mateo Silva",
-        gameId: "syllable-count",
-        score: 70,
-        correctAnswers: 14,
-        totalQuestions: 20,
-        averageTime: 18.5,
-        completedAt: "2024-01-14T14:32:00Z",
-      },
-    ],
-  },
-];
+// Mock data removed
 
 const difficultyLabels = {
   easy: "Fácil",
@@ -129,25 +38,46 @@ export default function TeacherReports({
   teacherName,
   onBack,
 }: TeacherReportsProps) {
+  const { user } = useAuth();
+  const { getTeacherReports } = useReports();
+  const [reports, setReports] = useState<RoomReport[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<RoomReport | null>(null);
 
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (user?.id) {
+        try {
+          const data = await getTeacherReports(user.id);
+          setReports(data);
+        } catch (error) {
+          console.error("Failed to fetch reports", error);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchReports();
+  }, [user?.id]);
+
   const overallStats = useMemo(() => {
-    const totalRooms = mockReports.length;
-    const totalStudents = mockReports.reduce(
+    const totalRooms = reports.length;
+    const totalStudents = reports.reduce(
       (sum, report) => sum + report.studentsCount,
       0,
     );
     const averageScore = Math.round(
-      mockReports.reduce((sum, report) => sum + report.averageScore, 0) /
-        (totalRooms || 1),
+      reports.reduce((sum, report) => sum + report.averageScore, 0) /
+      (totalRooms || 1),
     );
     const completionRate = Math.round(
-      mockReports.reduce((sum, report) => sum + report.completionRate, 0) /
-        (totalRooms || 1),
+      reports.reduce((sum, report) => sum + report.completionRate, 0) /
+      (totalRooms || 1),
     );
 
     return { totalRooms, totalStudents, averageScore, completionRate };
-  }, []);
+  }, [reports]);
 
   const formatDate = (isoString: string) => {
     return new Date(isoString).toLocaleDateString("es-ES", {
@@ -166,7 +96,7 @@ export default function TeacherReports({
     const gameName = resolveGameName(selectedReport.gameId);
     const difficultyLabel =
       difficultyLabels[
-        selectedReport.difficulty as keyof typeof difficultyLabels
+      selectedReport.difficulty as keyof typeof difficultyLabels
       ] ?? selectedReport.difficulty;
 
     return (
@@ -268,40 +198,48 @@ export default function TeacherReports({
       </View>
 
       <View style={styles.reportList}>
-        {mockReports.map((report) => (
-          <TouchableOpacity
-            key={report.roomId}
-            style={styles.reportCard}
-            onPress={() => setSelectedReport(report)}
-          >
-            <View style={styles.reportHeader}>
-              <Text style={styles.reportTitle}>{report.roomName}</Text>
-              <Text style={styles.reportDate}>
-                {formatDate(report.createdAt)}
+        {loading ? (
+          <ActivityIndicator size="large" color={palette.primary} />
+        ) : reports.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No hay reportes disponibles.</Text>
+          </View>
+        ) : (
+          reports.map((report) => (
+            <TouchableOpacity
+              key={report.roomId}
+              style={styles.reportCard}
+              onPress={() => setSelectedReport(report)}
+            >
+              <View style={styles.reportHeader}>
+                <Text style={styles.reportTitle}>{report.roomName}</Text>
+                <Text style={styles.reportDate}>
+                  {formatDate(report.createdAt)}
+                </Text>
+              </View>
+              <Text style={styles.reportSubtitle}>
+                {resolveGameName(report.gameId)} •{" "}
+                {difficultyLabels[
+                  report.difficulty as keyof typeof difficultyLabels
+                ] ?? report.difficulty}
               </Text>
-            </View>
-            <Text style={styles.reportSubtitle}>
-              {resolveGameName(report.gameId)} •{" "}
-              {difficultyLabels[
-                report.difficulty as keyof typeof difficultyLabels
-              ] ?? report.difficulty}
-            </Text>
-            <View style={styles.reportStatsRow}>
-              <View style={styles.statChip}>
-                <Text style={styles.statLabel}>Participantes</Text>
-                <Text style={styles.statValue}>{report.studentsCount}</Text>
+              <View style={styles.reportStatsRow}>
+                <View style={styles.statChip}>
+                  <Text style={styles.statLabel}>Participantes</Text>
+                  <Text style={styles.statValue}>{report.studentsCount}</Text>
+                </View>
+                <View style={styles.statChip}>
+                  <Text style={styles.statLabel}>Promedio</Text>
+                  <Text style={styles.statValue}>{report.averageScore}%</Text>
+                </View>
+                <View style={styles.statChip}>
+                  <Text style={styles.statLabel}>Completado</Text>
+                  <Text style={styles.statValue}>{report.completionRate}%</Text>
+                </View>
               </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statLabel}>Promedio</Text>
-                <Text style={styles.statValue}>{report.averageScore}%</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Text style={styles.statLabel}>Completado</Text>
-                <Text style={styles.statValue}>{report.completionRate}%</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
       </View>
 
       <TouchableOpacity style={styles.backButton} onPress={onBack}>
@@ -507,5 +445,18 @@ const styles = StyleSheet.create({
   backText: {
     color: palette.primary,
     fontWeight: "600",
+  },
+  emptyState: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: palette.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  emptyStateText: {
+    color: palette.muted,
+    fontSize: 16,
   },
 });

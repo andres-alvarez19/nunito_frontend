@@ -11,11 +11,14 @@ import {
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
+import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
 import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette } from "@/theme/colors";
-import type { Question } from "@/features/home/types/questions";
+import type { Question } from "@/models/questions";
 import { useUpload } from "@/services/useUpload";
 import { useNotification } from "@/contexts/NotificationContext";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 interface QuestionFormModalProps {
     isOpen: boolean;
     gameType: "image-word" | "syllable-count" | "rhyme-identification" | "audio-recognition";
@@ -55,6 +58,23 @@ export default function QuestionFormModal({
 
     // Audio fields
     const [audioUrl, setAudioUrl] = useState("");
+    const [audioTab, setAudioTab] = useState<'upload' | 'record' | 'ai'>('upload');
+    const [ttsText, setTtsText] = useState("");
+    const [recordedUri, setRecordedUri] = useState<string | null>(null);
+
+    const {
+        startRecording,
+        stopRecording,
+        isRecording,
+        audioUri: recorderUri,
+    } = useAudioRecorder();
+
+    // Update recordedUri when recorder finishes
+    useEffect(() => {
+        if (recorderUri) {
+            setRecordedUri(recorderUri);
+        }
+    }, [recorderUri]);
 
     // Update form when question changes (for editing)
     useEffect(() => {
@@ -80,8 +100,15 @@ export default function QuestionFormModal({
                     setNonRhymingWords(Array.isArray(question.options?.nonRhymingWords) && question.options.nonRhymingWords.length > 0 ? question.options.nonRhymingWords : ["", ""]);
                     break;
                 case "audio-recognition":
-                    setWord(question.text || "");
-                    setAudioUrl(question.options?.audioUrl || "");
+                    setWord(question.options?.word || "");
+                    const url = question.options?.audioUrl || "";
+                    setAudioUrl(url);
+                    if (url.startsWith('tts:')) {
+                        setAudioTab('ai');
+                        setTtsText(url.replace('tts:', ''));
+                    } else {
+                        setAudioTab('upload');
+                    }
                     setAlternatives(Array.isArray(question.options?.alternatives) && question.options.alternatives.length > 0 ? question.options.alternatives : ["", "", ""]);
                     break;
             }
@@ -100,6 +127,9 @@ export default function QuestionFormModal({
             setRhymingWords(["", ""]);
             setNonRhymingWords(["", ""]);
             setAudioUrl("");
+            setAudioTab('upload');
+            setTtsText("");
+            setRecordedUri(null);
         }
     }, [question, isOpen]);
 
@@ -148,6 +178,82 @@ export default function QuestionFormModal({
         }
     };
 
+    const handleStartRecording = async () => {
+        await startRecording();
+    };
+
+    const handleStopRecording = async () => {
+        await stopRecording();
+    };
+
+    const handlePlayRecording = async () => {
+        if (recordedUri) {
+            try {
+                const { sound } = await Audio.Sound.createAsync({ uri: recordedUri });
+                await sound.playAsync();
+            } catch (e) {
+                showError("No se pudo reproducir la grabación");
+            }
+        }
+    };
+
+    const handleUploadRecording = async () => {
+        if (recordedUri) {
+            try {
+                const url = await uploadAudio(recordedUri);
+                setAudioUrl(url);
+                showError("Grabación guardada correctamente"); // Using showError as generic toast for now if showSuccess not avail
+            } catch (e) {
+                showError("No se pudo subir la grabación");
+            }
+        }
+    };
+
+    const handlePreviewTts = async () => {
+        const text = ttsText.trim() || word;
+        console.log("Attempting to preview TTS with text:", text);
+
+        try {
+            // Ensure audio plays even in silent mode
+            await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+                allowsRecordingIOS: false,
+            });
+            console.log("Audio mode set for playback");
+        } catch (err) {
+            console.error("Error setting audio mode:", err);
+        }
+
+        if (text) {
+            try {
+                // Minimal implementation: No stop, no language
+                console.log("Calling Speech.speak (minimal)...");
+                Speech.speak(text, {
+                    onStart: () => console.log("TTS Started"),
+                    onDone: () => console.log("TTS Done"),
+                    onStopped: () => console.log("TTS Stopped"),
+                    onError: (e) => console.error("TTS Error Event:", e)
+                });
+            } catch (e) {
+                console.error("TTS Exception:", e);
+                showError("Error al reproducir audio");
+            }
+        } else {
+            console.log("No text to speak");
+            showError("Ingresa texto para escuchar");
+        }
+    };
+
+    const handleUseTts = () => {
+        const text = ttsText.trim() || word;
+        if (text) {
+            setAudioUrl(`tts:${text}`);
+            showError("Audio IA configurado");
+        } else {
+            showError("Ingresa texto para usar");
+        }
+    };
+
     const handleSave = () => {
         let questionData: any = {};
         if (gameType === "image-word") {
@@ -192,6 +298,7 @@ export default function QuestionFormModal({
                 text: questionText,
                 type: "audio-recognition",
                 options: {
+                    word,
                     audioUrl,
                     alternatives: alternatives.filter((a) => a.trim()),
                     hint: hint || undefined,
@@ -202,220 +309,242 @@ export default function QuestionFormModal({
         onSave(questionData);
     }
 
-        // Renderiza los campos específicos según el tipo de juego
-        const renderGameSpecificFields = () => {
-            if (gameType === "image-word") {
-                return (
-                    <>
-                        {/* Word */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Palabra Correcta</Text>
-                            <TextInput
-                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                value={word}
-                                onChangeText={setWord}
-                                placeholder="Ej: casa"
-                                placeholderTextColor={palette.muted}
-                            />
-                        </View>
-                        {/* Image */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Imagen</Text>
-                            <Pressable
-                                className="border-2 border-dashed border-border rounded-xl p-4 items-center justify-center bg-surfaceMuted/30 active:bg-surfaceMuted/50"
-                                onPress={handlePickImage}
-                            >
-                                {imageUrl ? (
-                                    <View className="items-center gap-2">
-                                        <Image
-                                            source={{ uri: imageUrl }}
-                                            className="w-32 h-32 rounded-lg"
-                                            resizeMode="cover"
-                                        />
-                                        <Text className="text-sm text-primary font-medium">Cambiar imagen</Text>
-                                    </View>
-                                ) : (
-                                    <View className="items-center gap-2">
-                                        <Feather name="image" size={48} color={palette.muted} />
-                                        <Text className="text-sm text-muted">Seleccionar imagen</Text>
-                                    </View>
-                                )}
-                            </Pressable>
-                        </View>
-                        {/* Alternatives */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Alternativas Incorrectas</Text>
-                            {alternatives.map((alt, index) => (
-                                <TextInput
-                                    key={index}
-                                    className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                    value={alt}
-                                    onChangeText={(text) => {
-                                        const newAlts = [...alternatives];
-                                        newAlts[index] = text;
-                                        setAlternatives(newAlts);
-                                    }}
-                                    placeholder={`Alternativa ${index + 1}`}
-                                    placeholderTextColor={palette.muted}
-                                />
-                            ))}
-                            <Pressable
-                                className="flex-row items-center gap-2 p-2 active:opacity-70"
-                                onPress={() => setAlternatives([...alternatives, ""])}
-                            >
-                                <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">Agregar alternativa</Text>
-                            </Pressable>
-                        </View>
-                    </>
-                );
-            } else if (gameType === "syllable-count") {
-                return (
-                    <>
-                        {/* Word */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Palabra</Text>
-                            <TextInput
-                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                value={word}
-                                onChangeText={setWord}
-                                placeholder="Ej: mariposa"
-                                placeholderTextColor={palette.muted}
-                            />
-                        </View>
-                        {/* Syllable Count */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Número de Sílabas (Correcto)</Text>
-                            <TextInput
-                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                value={syllableCount.toString()}
-                                onChangeText={(text) => setSyllableCount(parseInt(text) || 1)}
-                                keyboardType="number-pad"
-                                placeholder="Ej: 4"
-                                placeholderTextColor={palette.muted}
-                            />
-                        </View>
-                        {/* Syllable Separation */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Separación de Sílabas</Text>
-                            <TextInput
-                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                value={syllableSeparation}
-                                onChangeText={setSyllableSeparation}
-                                placeholder="Ej: ma-ri-po-sa"
-                                placeholderTextColor={palette.muted}
-                            />
-                        </View>
-                        {/* Alternatives */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Números Incorrectos</Text>
-                            <View className="flex-row gap-2">
-                                {syllableAlternatives.map((alt, index) => (
-                                    <TextInput
-                                        key={index}
-                                        className="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-base text-text text-center"
-                                        value={alt.toString()}
-                                        onChangeText={(text) => {
-                                            const newAlts = [...syllableAlternatives];
-                                            newAlts[index] = parseInt(text) || 0;
-                                            setSyllableAlternatives(newAlts);
-                                        }}
-                                        keyboardType="number-pad"
-                                        placeholderTextColor={palette.muted}
+    // Renderiza los campos específicos según el tipo de juego
+    const renderGameSpecificFields = () => {
+        if (gameType === "image-word") {
+            return (
+                <>
+                    {/* Word */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Palabra Correcta</Text>
+                        <TextInput
+                            className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                            value={word}
+                            onChangeText={setWord}
+                            placeholder="Ej: casa"
+                            placeholderTextColor={palette.muted}
+                        />
+                    </View>
+                    {/* Image */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Imagen</Text>
+                        <Pressable
+                            className="border-2 border-dashed border-border rounded-xl p-4 items-center justify-center bg-surfaceMuted/30 active:bg-surfaceMuted/50"
+                            onPress={handlePickImage}
+                        >
+                            {imageUrl ? (
+                                <View className="items-center gap-2">
+                                    <Image
+                                        source={{ uri: imageUrl }}
+                                        className="w-32 h-32 rounded-lg"
+                                        resizeMode="cover"
                                     />
-                                ))}
-                            </View>
-                        </View>
-                    </>
-                );
-            } else if (gameType === "rhyme-identification") {
-                return (
-                    <>
-                        {/* Main Word */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Palabra Principal</Text>
+                                    <Text className="text-sm text-primary font-medium">Cambiar imagen</Text>
+                                </View>
+                            ) : (
+                                <View className="items-center gap-2">
+                                    <Feather name="image" size={48} color={palette.muted} />
+                                    <Text className="text-sm text-muted">Seleccionar imagen</Text>
+                                </View>
+                            )}
+                        </Pressable>
+                    </View>
+                    {/* Alternatives */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Alternativas Incorrectas</Text>
+                        {alternatives.map((alt, index) => (
                             <TextInput
+                                key={index}
                                 className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                value={mainWord}
-                                onChangeText={setMainWord}
-                                placeholder="Ej: gato"
+                                value={alt}
+                                onChangeText={(text) => {
+                                    const newAlts = [...alternatives];
+                                    newAlts[index] = text;
+                                    setAlternatives(newAlts);
+                                }}
+                                placeholder={`Alternativa ${index + 1}`}
                                 placeholderTextColor={palette.muted}
                             />
-                        </View>
-                        {/* Rhyming Words */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Palabras que Riman</Text>
-                            {rhymingWords.map((word, index) => (
+                        ))}
+                        <Pressable
+                            className="flex-row items-center gap-2 p-2 active:opacity-70"
+                            onPress={() => setAlternatives([...alternatives, ""])}
+                        >
+                            <Feather name="plus-circle" size={20} color={palette.primary} />
+                            <Text className="text-sm text-primary font-medium">Agregar alternativa</Text>
+                        </Pressable>
+                    </View>
+                </>
+            );
+        } else if (gameType === "syllable-count") {
+            return (
+                <>
+                    {/* Word */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Palabra</Text>
+                        <TextInput
+                            className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                            value={word}
+                            onChangeText={setWord}
+                            placeholder="Ej: mariposa"
+                            placeholderTextColor={palette.muted}
+                        />
+                    </View>
+                    {/* Syllable Count */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Número de Sílabas (Correcto)</Text>
+                        <TextInput
+                            className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                            value={syllableCount.toString()}
+                            onChangeText={(text) => setSyllableCount(parseInt(text) || 1)}
+                            keyboardType="number-pad"
+                            placeholder="Ej: 4"
+                            placeholderTextColor={palette.muted}
+                        />
+                    </View>
+                    {/* Syllable Separation */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Separación de Sílabas</Text>
+                        <TextInput
+                            className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                            value={syllableSeparation}
+                            onChangeText={setSyllableSeparation}
+                            placeholder="Ej: ma-ri-po-sa"
+                            placeholderTextColor={palette.muted}
+                        />
+                    </View>
+                    {/* Alternatives */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Números Incorrectos</Text>
+                        <View className="flex-row gap-2">
+                            {syllableAlternatives.map((alt, index) => (
                                 <TextInput
                                     key={index}
-                                    className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                    value={word}
+                                    className="flex-1 rounded-xl border border-border bg-surface px-4 py-3 text-base text-text text-center"
+                                    value={alt.toString()}
                                     onChangeText={(text) => {
-                                        const newWords = [...rhymingWords];
-                                        newWords[index] = text;
-                                        setRhymingWords(newWords);
+                                        const newAlts = [...syllableAlternatives];
+                                        newAlts[index] = parseInt(text) || 0;
+                                        setSyllableAlternatives(newAlts);
                                     }}
-                                    placeholder={`Palabra ${index + 1}`}
+                                    keyboardType="number-pad"
                                     placeholderTextColor={palette.muted}
                                 />
                             ))}
-                            <Pressable
-                                className="flex-row items-center gap-2 p-2 active:opacity-70"
-                                onPress={() => setRhymingWords([...rhymingWords, ""])}
-                            >
-                                <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">Agregar palabra</Text>
-                            </Pressable>
                         </View>
-                        {/* Non-Rhyming Words */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Palabras que NO Riman</Text>
-                            {nonRhymingWords.map((word, index) => (
-                                <TextInput
-                                    key={index}
-                                    className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                    value={word}
-                                    onChangeText={(text) => {
-                                        const newWords = [...nonRhymingWords];
-                                        newWords[index] = text;
-                                        setNonRhymingWords(newWords);
-                                    }}
-                                    placeholder={`Palabra ${index + 1}`}
-                                    placeholderTextColor={palette.muted}
-                                />
-                            ))}
-                            <Pressable
-                                className="flex-row items-center gap-2 p-2 active:opacity-70"
-                                onPress={() => setNonRhymingWords([...nonRhymingWords, ""])}
-                            >
-                                <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">Agregar palabra</Text>
-                            </Pressable>
-                        </View>
-                    </>
-                );
-            } else if (gameType === "audio-recognition") {
-                return (
-                    <>
-                        {/* Text */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Palabra/Frase que se Oirá</Text>
+                    </View>
+                </>
+            );
+        } else if (gameType === "rhyme-identification") {
+            return (
+                <>
+                    {/* Main Word */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Palabra Principal</Text>
+                        <TextInput
+                            className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                            value={mainWord}
+                            onChangeText={setMainWord}
+                            placeholder="Ej: gato"
+                            placeholderTextColor={palette.muted}
+                        />
+                    </View>
+                    {/* Rhyming Words */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Palabras que Riman</Text>
+                        {rhymingWords.map((word, index) => (
                             <TextInput
+                                key={index}
                                 className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
                                 value={word}
-                                onChangeText={setWord}
-                                placeholder="Ej: elefante"
+                                onChangeText={(text) => {
+                                    const newWords = [...rhymingWords];
+                                    newWords[index] = text;
+                                    setRhymingWords(newWords);
+                                }}
+                                placeholder={`Palabra ${index + 1}`}
                                 placeholderTextColor={palette.muted}
                             />
+                        ))}
+                        <Pressable
+                            className="flex-row items-center gap-2 p-2 active:opacity-70"
+                            onPress={() => setRhymingWords([...rhymingWords, ""])}
+                        >
+                            <Feather name="plus-circle" size={20} color={palette.primary} />
+                            <Text className="text-sm text-primary font-medium">Agregar palabra</Text>
+                        </Pressable>
+                    </View>
+                    {/* Non-Rhyming Words */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Palabras que NO Riman</Text>
+                        {nonRhymingWords.map((word, index) => (
+                            <TextInput
+                                key={index}
+                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                                value={word}
+                                onChangeText={(text) => {
+                                    const newWords = [...nonRhymingWords];
+                                    newWords[index] = text;
+                                    setNonRhymingWords(newWords);
+                                }}
+                                placeholder={`Palabra ${index + 1}`}
+                                placeholderTextColor={palette.muted}
+                            />
+                        ))}
+                        <Pressable
+                            className="flex-row items-center gap-2 p-2 active:opacity-70"
+                            onPress={() => setNonRhymingWords([...nonRhymingWords, ""])}
+                        >
+                            <Feather name="plus-circle" size={20} color={palette.primary} />
+                            <Text className="text-sm text-primary font-medium">Agregar palabra</Text>
+                        </Pressable>
+                    </View>
+                </>
+            );
+        } else if (gameType === "audio-recognition") {
+            return (
+                <>
+                    {/* Text */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Palabra/Frase que se Oirá</Text>
+                        <TextInput
+                            className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                            value={word}
+                            onChangeText={setWord}
+                            placeholder="Ej: elefante"
+                            placeholderTextColor={palette.muted}
+                        />
+                    </View>
+                    {/* Audio Options Tabs */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Audio</Text>
+                        <View className="flex-row bg-surfaceMuted/30 p-1 rounded-xl mb-2">
+                            <Pressable
+                                className={`flex-1 py-2 rounded-lg items-center ${audioTab === 'upload' ? 'bg-surface shadow-sm' : ''}`}
+                                onPress={() => setAudioTab('upload')}
+                            >
+                                <Text className={`text-sm font-medium ${audioTab === 'upload' ? 'text-primary' : 'text-muted'}`}>Subir</Text>
+                            </Pressable>
+                            <Pressable
+                                className={`flex-1 py-2 rounded-lg items-center ${audioTab === 'record' ? 'bg-surface shadow-sm' : ''}`}
+                                onPress={() => setAudioTab('record')}
+                            >
+                                <Text className={`text-sm font-medium ${audioTab === 'record' ? 'text-primary' : 'text-muted'}`}>Grabar</Text>
+                            </Pressable>
+                            <Pressable
+                                className={`flex-1 py-2 rounded-lg items-center ${audioTab === 'ai' ? 'bg-surface shadow-sm' : ''}`}
+                                onPress={() => setAudioTab('ai')}
+                            >
+                                <Text className={`text-sm font-medium ${audioTab === 'ai' ? 'text-primary' : 'text-muted'}`}>IA (TTS)</Text>
+                            </Pressable>
                         </View>
-                        {/* Audio */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Audio</Text>
+
+                        {audioTab === 'upload' && (
                             <Pressable
                                 className="border-2 border-dashed border-border rounded-xl p-4 items-center justify-center bg-surfaceMuted/30 active:bg-surfaceMuted/50"
                                 onPress={handlePickAudio}
                             >
-                                {audioUrl ? (
+                                {audioUrl && !audioUrl.startsWith('tts:') ? (
                                     <View className="items-center gap-2">
                                         <Feather name="check-circle" size={48} color={palette.primary} />
                                         <Text className="text-sm text-primary font-medium">Audio seleccionado</Text>
@@ -429,37 +558,121 @@ export default function QuestionFormModal({
                                     </View>
                                 )}
                             </Pressable>
-                        </View>
-                        {/* Alternatives */}
-                        <View className="gap-2">
-                            <Text className="text-sm font-semibold text-text">Alternativas Incorrectas</Text>
-                            {alternatives.map((alt, index) => (
-                                <TextInput
-                                    key={index}
-                                    className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
-                                    value={alt}
-                                    onChangeText={(text) => {
-                                        const newAlts = [...alternatives];
-                                        newAlts[index] = text;
-                                        setAlternatives(newAlts);
-                                    }}
-                                    placeholder={`Alternativa ${index + 1}`}
-                                    placeholderTextColor={palette.muted}
-                                />
-                            ))}
-                            <Pressable
-                                className="flex-row items-center gap-2 p-2 active:opacity-70"
-                                onPress={() => setAlternatives([...alternatives, ""])}
-                            >
-                                <Feather name="plus-circle" size={20} color={palette.primary} />
-                                <Text className="text-sm text-primary font-medium">Agregar alternativa</Text>
-                            </Pressable>
-                        </View>
-                    </>
-                );
-            }
-            return null;
-        };
+                        )}
+
+                        {audioTab === 'record' && (
+                            <View className="border-2 border-dashed border-border rounded-xl p-4 items-center justify-center bg-surfaceMuted/30">
+                                {isRecording ? (
+                                    <View className="items-center gap-4">
+                                        <View className="w-16 h-16 rounded-full bg-error/20 items-center justify-center animate-pulse">
+                                            <Feather name="mic" size={32} color={palette.error} />
+                                        </View>
+                                        <Text className="text-sm text-error font-medium">Grabando...</Text>
+                                        <NunitoButton onPress={handleStopRecording} contentStyle={{ backgroundColor: palette.error }}>
+                                            <Text className="text-white font-bold">Detener</Text>
+                                        </NunitoButton>
+                                    </View>
+                                ) : (
+                                    <View className="items-center gap-4">
+                                        {recordedUri ? (
+                                            <View className="items-center gap-2 mb-2">
+                                                <Feather name="check-circle" size={32} color={palette.primary} />
+                                                <Text className="text-sm text-primary font-medium">Audio grabado</Text>
+                                                <View className="flex-row gap-2">
+                                                    <Pressable onPress={handlePlayRecording} className="p-2 bg-primary/10 rounded-full">
+                                                        <Feather name="play" size={20} color={palette.primary} />
+                                                    </Pressable>
+                                                    <Pressable onPress={() => setRecordedUri(null)} className="p-2 bg-error/10 rounded-full">
+                                                        <Feather name="trash-2" size={20} color={palette.error} />
+                                                    </Pressable>
+                                                </View>
+                                            </View>
+                                        ) : (
+                                            <View className="items-center gap-2">
+                                                <Feather name="mic" size={48} color={palette.muted} />
+                                                <Text className="text-sm text-muted">Presiona para grabar</Text>
+                                            </View>
+                                        )}
+                                        {!recordedUri && (
+                                            <NunitoButton onPress={handleStartRecording}>
+                                                <Text className="text-primaryOn font-bold">Iniciar Grabación</Text>
+                                            </NunitoButton>
+                                        )}
+                                        {recordedUri && (
+                                            <NunitoButton onPress={handleUploadRecording} disabled={uploading}>
+                                                <Text className="text-primaryOn font-bold">
+                                                    {uploading ? "Subiendo..." : "Usar Grabación"}
+                                                </Text>
+                                            </NunitoButton>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+                        )}
+
+                        {audioTab === 'ai' && (
+                            <View className="border-2 border-dashed border-border rounded-xl p-4 bg-surfaceMuted/30 gap-4">
+                                <View className="gap-2">
+                                    <Text className="text-sm font-medium text-text">Texto para leer (TTS)</Text>
+                                    <TextInput
+                                        className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                                        value={ttsText}
+                                        onChangeText={setTtsText}
+                                        placeholder="Escribe el texto aquí..."
+                                        placeholderTextColor={palette.muted}
+                                    />
+                                </View>
+                                <View className="flex-row gap-2">
+                                    <View className="flex-1">
+                                        <NunitoButton onPress={handlePreviewTts} contentStyle={{ backgroundColor: palette.secondary }}>
+                                            <Text className="text-white font-bold">Escuchar</Text>
+                                        </NunitoButton>
+                                    </View>
+                                    <View className="flex-1">
+                                        <NunitoButton onPress={handleUseTts}>
+                                            <Text className="text-primaryOn font-bold">Usar este audio</Text>
+                                        </NunitoButton>
+                                    </View>
+                                </View>
+                                {audioUrl && audioUrl.startsWith('tts:') && (
+                                    <View className="flex-row items-center gap-2 justify-center mt-2">
+                                        <Feather name="check" size={16} color={palette.primary} />
+                                        <Text className="text-sm text-primary">Audio configurado: {audioUrl.replace('tts:', '')}</Text>
+                                    </View>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                    {/* Alternatives */}
+                    <View className="gap-2">
+                        <Text className="text-sm font-semibold text-text">Alternativas Incorrectas</Text>
+                        {alternatives.map((alt, index) => (
+                            <TextInput
+                                key={index}
+                                className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                                value={alt}
+                                onChangeText={(text) => {
+                                    const newAlts = [...alternatives];
+                                    newAlts[index] = text;
+                                    setAlternatives(newAlts);
+                                }}
+                                placeholder={`Alternativa ${index + 1}`}
+                                placeholderTextColor={palette.muted}
+                            />
+                        ))}
+                        <Pressable
+                            className="flex-row items-center gap-2 p-2 active:opacity-70"
+                            onPress={() => setAlternatives([...alternatives, ""])}
+                        >
+                            <Feather name="plus-circle" size={20} color={palette.primary} />
+                            <Text className="text-sm text-primary font-medium">Agregar alternativa</Text>
+                        </Pressable>
+                    </View>
+                </>
+            );
+        }
+        return null;
+    };
     const getGameTitle = () => {
         switch (gameType) {
             case "image-word":

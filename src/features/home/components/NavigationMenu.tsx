@@ -8,6 +8,8 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from 'expo-clipboard';
+
 
 import {
   gameDefinitions,
@@ -26,19 +28,20 @@ import GameQuestionEditor from "@/features/home/components/teacher/GameQuestionE
 import { useAuth } from "@/contexts/AuthContext";
 import StudentWaitingRoom from "./student/StudentWaitingRoom";
 import StudentGameStart from "./student/StudentGameStart";
-import RoomCreationFlow, {
-  type Room,
-} from "@/features/home/components/teacher/RoomCreationFlow";
+import RoomCreationFlow from "@/features/home/components/teacher/RoomCreationFlow";
 import ProgressBar from "@/features/home/components/teacher/ProgressBar";
 import { palette, withAlpha } from "@/theme/colors";
 import TeacherDashboard from "@/features/home/components/TeacherDashboard";
 import MyRooms from "@/features/home/components/MyRooms";
-import { RoomSummaryItem, StudentResult, DifficultyOption } from "@/features/home/types";
+import { RoomSummaryItem, StudentResult, DifficultyOption, Room } from "@/features/home/types";
 
 import ConnectedUsersList from "@/features/home/components/ConnectedUsersList";
 import TeacherWaitingRoom from "@/features/home/components/teacher/TeacherWaitingRoom";
 import TeacherLiveSession from "@/features/home/components/teacher/TeacherLiveSession";
 import { useDashboard } from "@/services/useDashboard";
+import { useRoomSocket } from "@/hooks/useRoomSocket";
+import { useRoomMonitoring } from "@/hooks/useRoomMonitoring";
+import { updateRoomStatus } from "@/services/useRooms";
 
 interface NavigationMenuProps {
   userType: "teacher" | "student";
@@ -52,8 +55,6 @@ type MenuItem = {
   label: string;
   description: string;
 };
-
-
 
 const teacherMenuItems: MenuItem[] = [
   { id: "home", label: "Inicio", description: "Panel principal" },
@@ -75,8 +76,6 @@ const studentMenuItems: MenuItem[] = [
   { id: "home", label: "Inicio", description: "Información de la sala" },
   { id: "games", label: "Juegos", description: "Ver actividades disponibles" },
 ];
-
-
 
 type TeacherConfigSettings = {
   availableGames: Record<string, boolean>;
@@ -171,8 +170,6 @@ const createDefaultSettings = (): TeacherConfigSettings => ({
   }, {}),
 });
 
-
-
 export default function NavigationMenu({
   userType,
   userName,
@@ -204,18 +201,67 @@ export default function NavigationMenu({
   // Session state
   const [sessionStatus, setSessionStatus] = useState<"idle" | "waiting" | "live">("idle");
   const [roomCode, setRoomCode] = useState<string | null>(null);
-  const [connectedUsers, setConnectedUsers] = useState<{ id: string, name: string }[]>([
-    { id: '1', name: 'Ana' },
-    { id: '2', name: 'Carlos' },
-    { id: '3', name: 'María' },
-  ]);
+  // Removed local connectedUsers state as we use the socket now
   const [activeSessionRoomId, setActiveSessionRoomId] = useState<string | null>(null);
 
   // Room creation state
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeout = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timeout);
+  }, [copied]);
+
+  const handleCopyCode = async (code: string) => {
+    await Clipboard.setStringAsync(code);
+    setCopied(true);
+  };
 
   // Dashboard hook
-  const { activeRooms, pastRooms, fetchRooms } = useDashboard();
+  const { activeRooms, pendingRooms, pastRooms, fetchRooms } = useDashboard();
+
+  // WebSocket Integration
+  // Determine which room to connect to: active session room OR selected room details (if active/pending)
+  const socketRoomId = useMemo(() => {
+    if (activeSessionRoomId) return activeSessionRoomId;
+    if (selectedRoom && (selectedRoom.status === 'active' || selectedRoom.status === 'pending')) {
+      return selectedRoom.id;
+    }
+    return null;
+  }, [activeSessionRoomId, selectedRoom]);
+
+  const { users: liveConnectedUsers, roomStatus, status: connectionStatus, startActivity, stompClient } = useRoomSocket({
+    roomId: socketRoomId || "",
+    userId: user?.id || "teacher-temp-id",
+    userName: user?.name || userName || "Profesor",
+    isTeacher: userType === "teacher",
+    enabled: !!socketRoomId,
+  });
+
+  const { students: monitoredStudents, globalStats, ranking } = useRoomMonitoring({
+    roomId: socketRoomId || "",
+    stompClient
+  });
+
+  // Re-destructure useRoomSocket to get stompClient
+  // I'll do this in the next chunk or fix the previous one.
+  // Actually, I can't easily change the previous chunk's destructuring without replacing the whole block.
+  // I will replace the useRoomSocket call block.
+
+  // Effect to handle room status changes
+  useEffect(() => {
+    if (roomStatus === 'STARTED') {
+      setSessionStatus('live');
+    }
+  }, [roomStatus]);
+
+  const connectedUserNames = useMemo(() => {
+    return liveConnectedUsers
+      .filter(u => u.userId !== user?.id)
+      .map(u => u.name);
+  }, [liveConnectedUsers, user?.id]);
 
   // Fetch rooms when entering "rooms" section or on mount if needed
   // For now, let's fetch when user is teacher
@@ -295,27 +341,40 @@ export default function NavigationMenu({
   const formatSeconds = (seconds: number) => `${seconds.toFixed(1)}s`;
 
   const handleStartActivity = (roomId: string) => {
-    const room = activeRooms.find((r) => r.id === roomId);
+    const room = activeRooms.find((r) => r.id === roomId) || pendingRooms.find((r) => r.id === roomId);
     if (room) {
       setActiveSessionRoomId(roomId);
       setSessionStatus("waiting");
     }
   };
 
-  const handleLaunchGame = () => {
+  const handleLaunchGame = async () => {
     // In a real app, this would trigger the countdown and then start the game
+    if (activeSessionRoomId) {
+      // Notify backend that room is active
+      await updateRoomStatus(activeSessionRoomId, 'active', true);
+      // Start via socket
+      startActivity();
+    }
     setSessionStatus("live");
   };
 
-  const handleEndActivity = () => {
+  const handleEndActivity = async () => {
+    if (activeSessionRoomId) {
+      // Notify backend that room is finished
+      await updateRoomStatus(activeSessionRoomId, 'finished', false);
+    }
     setSessionStatus("idle");
     setActiveSessionRoomId(null);
     // Optionally navigate to reports or show a summary
     setActiveSection("reports");
+    // Refresh rooms list
+    if (user?.id) fetchRooms(user.id);
   };
 
   const renderRoomDetailView = (backTarget: "rooms" | "reports") => {
     if (!selectedRoom) return null;
+    console.log("Detalles de la sala seleccionada:", JSON.stringify(selectedRoom, null, 2));
     const difficultyLabel =
       selectedRoom.difficulty === "easy"
         ? "Fácil"
@@ -354,19 +413,37 @@ export default function NavigationMenu({
         <View className="mt-3.5 p-4 rounded-2xl border border-border/80 bg-surface shadow-sm gap-3">
           <View className="flex-row justify-between items-center gap-3">
             <View>
-              <Text className="text-lg font-extrabold text-text">{gameName}</Text>
+              <Text className="text-lg font-extrabold text-text">{selectedRoom.title}</Text>
               <Text className="text-sm text-muted">
                 {difficultyLabel} • {formatDate(selectedRoom.createdAt)}
               </Text>
             </View>
             <View className="px-2.5 py-1.5 rounded-full bg-primary/10 border border-primary/50">
               <Text className="text-xs font-bold text-primary">
-                {selectedRoom.status === "active" ? "Activa" : "Finalizada"}
+                {selectedRoom.status === "active" ? "Activa" : selectedRoom.status === "pending" ? "Pendiente" : "Finalizada"}
               </Text>
             </View>
           </View>
 
           <View className="flex-row flex-wrap gap-2.5">
+            {selectedRoom.code && (
+              <View className="w-full p-3 rounded-xl border border-border/70 bg-surfaceMuted flex-row items-center justify-between">
+                <View>
+                  <Text className="text-xs text-muted mb-1">Código de sala</Text>
+                  <Text className="text-2xl font-mono font-bold text-primary tracking-widest">
+                    {selectedRoom.code}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  className="px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 active:bg-primary/20"
+                  onPress={() => handleCopyCode(selectedRoom.code!)}
+                >
+                  <Text className="text-sm font-bold text-primary">
+                    {copied ? "¡Copiado!" : "Copiar"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <View className="flex-1 min-w-[150px] p-3 rounded-xl border border-border/70 bg-surfaceMuted">
               <Text className="text-xs text-muted mb-1">Estudiantes</Text>
               <Text className="text-lg font-bold text-text">
@@ -391,11 +468,21 @@ export default function NavigationMenu({
                 {formatDate(selectedRoom.createdAt)}
               </Text>
             </View>
+            <View className="w-full p-3 rounded-xl border border-border/70 bg-surfaceMuted">
+              <Text className="text-xs text-muted mb-1">Juegos seleccionados</Text>
+              <View className="flex-row flex-wrap gap-2">
+                {selectedRoom.gameLabels?.map((label, index) => (
+                  <View key={index} className="bg-primary/10 px-2 py-1 rounded-md border border-primary/20">
+                    <Text className="text-sm font-bold text-text">{label}</Text>
+                  </View>
+                )) || <Text className="text-lg font-bold text-text">{gameName}</Text>}
+              </View>
+            </View>
           </View>
 
           <View className="gap-2.5">
             <Text className="text-base font-bold text-text">Resultados por estudiante</Text>
-            {selectedRoom.studentsResults.map((student) => (
+            {(selectedRoom.studentsResults || []).map((student) => (
               <View key={student.name} className="border border-border/80 rounded-xl p-3 gap-2.5 bg-surface shadow-sm">
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[15px] font-bold text-text">{student.name}</Text>
@@ -436,11 +523,11 @@ export default function NavigationMenu({
             ))}
           </View>
 
-          {selectedRoom.status === "active" && (
+          {(selectedRoom.status === "active" || selectedRoom.status === "pending") && (
             <View className="mt-4">
               <ConnectedUsersList
-                connectedUsers={["Juan Pérez", "María González"]}
-                connectingUsers={["Pedro Sánchez"]}
+                connectedUsers={connectedUserNames}
+                connectingUsers={[]}
               />
               <View className="mt-4">
                 <TouchableOpacity
@@ -460,15 +547,17 @@ export default function NavigationMenu({
   const renderTeacherSection = () => {
     // Handle active session views
     if (sessionStatus === "waiting" && activeSessionRoomId) {
-      const room = activeRooms.find((r) => r.id === activeSessionRoomId);
+      const room = activeRooms.find((r) => r.id === activeSessionRoomId) || pendingRooms.find((r) => r.id === activeSessionRoomId);
       if (room) {
         return (
           <TeacherWaitingRoom
             roomCode={room.code || "----"}
             gameName={room.gameLabel}
-            connectedUsers={["Juan Pérez", "María González"]}
-            connectingUsers={["Pedro Sánchez"]}
+            selectedGames={[room.gameLabel]}
+            connectedUsers={connectedUserNames}
+            connectingUsers={[]}
             onStartActivity={handleLaunchGame}
+            connectionStatus={connectionStatus}
             onCancel={() => {
               setSessionStatus("idle");
               setActiveSessionRoomId(null);
@@ -479,13 +568,26 @@ export default function NavigationMenu({
     }
 
     if (sessionStatus === "live" && activeSessionRoomId) {
-      const room = activeRooms.find((r) => r.id === activeSessionRoomId);
+      const room = activeRooms.find((r) => r.id === activeSessionRoomId) || pendingRooms.find((r) => r.id === activeSessionRoomId);
       if (room) {
         return (
           <TeacherLiveSession
             roomCode={room.code || "----"}
             gameName={room.gameLabel}
-            connectedCount={3}
+            connectedCount={connectedUserNames.length}
+            connectedUsers={connectedUserNames}
+            monitoringData={{
+              roomId: room.id,
+              timestamp: new Date().toISOString(),
+              students: monitoredStudents,
+              globalStats: globalStats || {
+                activeStudentsCount: 0,
+                totalAnsweredAll: 0,
+                totalCorrectAll: 0,
+                globalAccuracyPct: 0,
+              },
+              ranking: ranking
+            }}
             onEndActivity={handleEndActivity}
           />
         );
@@ -519,29 +621,31 @@ export default function NavigationMenu({
               onRoomCreated={(newRoom: Room) => {
                 console.log("Nueva sala creada:", newRoom);
                 setIsCreatingRoom(false);
-                // Add new room to activeRooms so it appears immediately
-                if (typeof activeRooms !== "undefined") {
+                // Add new room to pendingRooms so it appears immediately
+                if (typeof pendingRooms !== "undefined") {
                   // Transform Room to RoomSummaryItem for immediate display
                   const now = new Date();
                   const summary: RoomSummaryItem = {
                     id: newRoom.id,
                     title: newRoom.name,
-                    gameLabel: newRoom.games && newRoom.games.length > 0 ? newRoom.games.map(g => {
-                      const def = gameDefinitions.find(def => def.id === g);
-                      return def ? def.name : g;
-                    }).join(", ") : "Sin juegos",
-                    gameId: newRoom.games[0] || "image-word",
+                    gameLabel: newRoom.game ? (gameDefinitions.find(def => def.id === newRoom.game)?.name || newRoom.game) : "Sin juegos",
+                    gameId: (newRoom.game as any) || "image-word",
                     difficulty: newRoom.difficulty,
                     createdAt: now.toISOString(),
                     dateTime: now.toLocaleString(),
                     students: newRoom.students.length,
                     average: 0,
                     completion: 0,
-                    status: "active",
+                    status: "pending",
                     studentsResults: [],
                     code: newRoom.code,
+                    gameLabels: (newRoom as any).games
+                      ? (newRoom as any).games.map((gId: string) => gameDefinitions.find(def => def.id === gId)?.name || gId)
+                      : newRoom.game
+                        ? [gameDefinitions.find(def => def.id === newRoom.game)?.name || newRoom.game]
+                        : ["Sin juegos"],
                   };
-                  activeRooms.push(summary);
+                  pendingRooms.push(summary);
                 }
               }}
               onCancel={() => setIsCreatingRoom(false)}
@@ -557,6 +661,7 @@ export default function NavigationMenu({
         return (
           <MyRooms
             activeRooms={activeRooms}
+            pendingRooms={pendingRooms}
             pastRooms={pastRooms}
             onNavigateToRoom={setSelectedRoom}
             onCreateRoom={() => setIsCreatingRoom(true)}
@@ -959,8 +1064,9 @@ export default function NavigationMenu({
       return (
         <StudentWaitingRoom
           roomCode={roomCode || "----"}
-          connectedStudents={connectedUsers.map(u => u.name)}
+          connectedStudents={connectedUserNames}
           studentName={userName}
+          connectionStatus={connectionStatus}
         />
       );
     }

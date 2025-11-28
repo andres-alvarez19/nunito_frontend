@@ -70,23 +70,25 @@ export default function RoomCreation({
   const handleSubmit = () => {
     if (!isValid || !difficulty) return;
     setIsSubmitting(true);
-
-    setTimeout(() => {
-      const newRoom: Room = {
-        id: Date.now().toString(),
-        code: Math.random().toString(36).substring(2, 8).toUpperCase(),
-        name: roomName,
-        game: selectedGame,
-        difficulty,
-        duration,
-        teacher,
-        students: [],
-        isActive: false,
-      };
-
-      onRoomCreated(newRoom);
-      setIsSubmitting(false);
-    }, 600);
+    (async () => {
+      try {
+        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const newRoom = await createRoom({
+          code,
+          name: roomName,
+          game: selectedGame,
+          difficulty,
+          duration,
+          teacher,
+        });
+        onRoomCreated(newRoom);
+      } catch (error) {
+        // Puedes mostrar un toast o alert aquí
+        console.error("Error creando sala:", error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    })();
   };
 
   return (

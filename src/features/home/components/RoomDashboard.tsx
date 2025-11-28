@@ -15,6 +15,10 @@ import NunitoButton from "@/features/home/components/NunitoButton";
 import { palette, withAlpha } from "@/theme/colors";
 import type { Room } from "@/features/home/types";
 import { formatSeconds } from "@/utils/time";
+import { useRoomSocket } from "@/hooks/useRoomSocket";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRoomMonitoring } from "@/hooks/useRoomMonitoring";
+import { StudentMonitoringStateDto } from "@/types/monitoring";
 
 interface RoomDashboardProps {
   room: Room;
@@ -37,12 +41,83 @@ export default function RoomDashboard({
   onViewResults,
   onBack,
 }: RoomDashboardProps) {
-  const [timeRemaining, setTimeRemaining] = useState(room.duration * 60);
+  const { user } = useAuth();
+  // Use durationMinutes if available, otherwise fallback to duration or default
+  const duration = room.durationMinutes ?? room.duration ?? 10;
+  const [timeRemaining, setTimeRemaining] = useState(duration * 60);
   const [copied, setCopied] = useState(false);
 
+  // WebSocket Integration
+  const { users: connectedUsers, answers, status: connectionStatus, stompClient } = useRoomSocket({
+    roomId: room.id,
+    userId: user?.id || "teacher-temp-id",
+    userName: user?.name || "Profesor",
+    enabled: true, // Always connect when in dashboard
+  });
+
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedStudentId && studentsList.length > 0) {
+      setSelectedStudentId(studentsList[0].userId);
+    }
+  }, [studentsList, selectedStudentId]);
+
+  const globalAccuracy = useMemo(() => {
+    const totalAnswers = answers.length;
+    const totalCorrect = answers.filter(a => a.correct).length;
+    return totalAnswers > 0 ? (totalCorrect / totalAnswers) * 100 : 0;
+  }, [answers]);
+
+  const selectedStudentAnswers = useMemo(() => {
+    return answers.filter(a => a.studentId === selectedStudentId);
+  }, [answers, selectedStudentId]);
+
+  useEffect(() => {
+    console.log('RoomDashboard answers:', answers);
+    console.log('RoomDashboard globalAccuracy:', globalAccuracy);
+    console.log('RoomDashboard selectedStudentId:', selectedStudentId);
+  }, [answers, globalAccuracy, selectedStudentId]);
+
+  const { students: monitoredStudents, globalStats, ranking, connectionState } = useRoomMonitoring({
+    roomId: room.id,
+    stompClient: null // We need the client from useRoomSocket, but useRoomSocket doesn't return it yet in the component usage above.
+    // Wait, I updated useRoomSocket to return it. I need to destructure it.
+  });
+
+  // Re-call useRoomSocket to get the client properly
+  // Actually, I should just update the destructuring above.
+  // But since I can't easily edit the destructuring line without replacing the whole block, I'll do it in a separate chunk or just here if I can match it.
+  // Let's try to match the previous chunk better.
+  // I will replace the useRoomSocket call to include stompClient.
+
+  // Filter out the teacher from the student list and merge with students who have answered
+  const studentsList = useMemo(() => {
+    const studentsMap = new Map<string, { userId: string; name: string }>();
+
+    // Add connected users
+    connectedUsers.forEach(u => {
+      if (u.userId !== user?.id) {
+        studentsMap.set(u.userId, u);
+      }
+    });
+
+    // Add students from answers (in case they are not in connected list)
+    answers.forEach(a => {
+      if (a.studentId !== user?.id && !studentsMap.has(a.studentId)) {
+        studentsMap.set(a.studentId, { userId: a.studentId, name: a.studentName });
+      }
+    });
+
+    return Array.from(studentsMap.values());
+  }, [connectedUsers, answers, user?.id]);
+
+  // Handle game array or single game
+  const gameId = room.games?.[0]?.id ?? room.game;
+
   const gameDefinition = useMemo(
-    () => gameDefinitions.find((definition) => definition.id === room.game),
-    [room.game],
+    () => gameDefinitions.find((definition) => definition.id === gameId),
+    [gameId],
   );
   const gameName = gameDefinition?.name ?? "Actividad";
   const gameTheme = gameDefinition
@@ -51,8 +126,8 @@ export default function RoomDashboard({
   const difficultyLabel = difficultyLabels[room.difficulty] ?? room.difficulty;
 
   useEffect(() => {
-    setTimeRemaining(room.duration * 60);
-  }, [room.duration, room.code]);
+    setTimeRemaining(duration * 60);
+  }, [duration, room.code]);
 
   useEffect(() => {
     if (!room.isActive) return;
@@ -67,9 +142,9 @@ export default function RoomDashboard({
 
   useEffect(() => {
     if (!room.isActive) {
-      setTimeRemaining(room.duration * 60);
+      setTimeRemaining(duration * 60);
     }
-  }, [room.isActive, room.duration]);
+  }, [room.isActive, duration]);
 
   useEffect(() => {
     if (!copied) return;
@@ -78,7 +153,7 @@ export default function RoomDashboard({
   }, [copied]);
 
   const handleStartPress = () => {
-    setTimeRemaining(room.duration * 60);
+    setTimeRemaining(duration * 60);
     onStartGame();
   };
 
@@ -92,6 +167,9 @@ export default function RoomDashboard({
 
   const formattedTimer = formatSeconds(timeRemaining);
 
+  // Teacher name fallback
+  const teacherName = room.teacher?.name ?? user?.name ?? "Profesor";
+
   return (
     <ScrollView style={styles.wrapper} contentContainerStyle={styles.content}>
       <View style={styles.headerCard}>
@@ -99,7 +177,7 @@ export default function RoomDashboard({
           <View style={styles.headerTextGroup}>
             <Text style={styles.title}>{room.name}</Text>
             <Text style={styles.subtitle}>
-              Sala creada por {room.teacher.name}
+              Sala creada por {teacherName}
             </Text>
           </View>
           <View
@@ -129,10 +207,10 @@ export default function RoomDashboard({
         <View style={styles.statsGrid}>
           <InfoChip label="Juego" value={gameName} />
           <InfoChip label="Dificultad" value={difficultyLabel} />
-          <InfoChip label="Duración" value={`${room.duration} minutos`} />
+          <InfoChip label="Duración" value={`${duration} minutos`} />
           <InfoChip
             label="Estudiantes"
-            value={room.students.length.toString()}
+            value={studentsList.length.toString()}
           />
         </View>
 
@@ -154,8 +232,8 @@ export default function RoomDashboard({
         <View style={styles.controlRow}>
           {!room.isActive ? (
             <NunitoButton
-              style={room.students.length === 0 && styles.disabledButton}
-              disabled={room.students.length === 0}
+              style={studentsList.length === 0 && styles.disabledButton}
+              disabled={studentsList.length === 0}
               onPress={handleStartPress}
             >
               <Text style={styles.primaryButtonText}>Iniciar juego</Text>
@@ -181,8 +259,92 @@ export default function RoomDashboard({
       </View>
 
       <View style={styles.studentsCard}>
-        <Text style={styles.sectionTitle}>Estudiantes conectados</Text>
-        {room.students.length === 0 ? (
+        {/* Real-time Room Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>Sala en tiempo real</Text>
+
+          <View style={styles.statsRow}>
+            <InfoChip label="Promedio Global (Sala)" value={`${globalAccuracy.toFixed(1)}%`} />
+          </View>
+
+          <Text style={styles.subTitle}>Alumno seleccionado</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.studentSelector}>
+            {studentsList.map(student => (
+              <TouchableOpacity
+                key={student.userId}
+                style={[
+                  styles.studentChip,
+                  selectedStudentId === student.userId && styles.studentChipSelected
+                ]}
+                onPress={() => setSelectedStudentId(student.userId)}
+              >
+                <Text style={[
+                  styles.studentChipText,
+                  selectedStudentId === student.userId && styles.studentChipTextSelected
+                ]}>
+                  {student.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <Text style={styles.subTitle}>Respuestas de {studentsList.find(s => s.userId === selectedStudentId)?.name || '...'}</Text>
+          {selectedStudentAnswers.length === 0 ? (
+            <Text style={styles.emptyText}>Aún no hay respuestas de este alumno.</Text>
+          ) : (
+            selectedStudentAnswers.map((a, idx) => (
+              <View key={idx} style={styles.answerRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.questionId}>Pregunta: {a.questionId}</Text>
+                  <Text style={styles.answerText}>Respuesta: {a.answer}</Text>
+                </View>
+                <View style={[
+                  styles.resultBadge,
+                  a.correct ? styles.resultBadgeCorrect : styles.resultBadgeIncorrect
+                ]}>
+                  <Text style={[
+                    styles.resultText,
+                    a.correct ? styles.resultTextCorrect : styles.resultTextIncorrect
+                  ]}>
+                    {a.correct ? 'Correcta' : 'Incorrecta'}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={styles.sectionTitle}>Estudiantes conectados</Text>
+          <Text style={{ fontSize: 12, color: palette.muted }}>
+            {connectionStatus === 'CONNECTING' ? 'Conectando...' :
+              connectionStatus === 'CONNECTED' ? 'En línea' : 'Desconectado'}
+          </Text>
+        </View>
+
+        {/* Global Stats */}
+        {globalStats && (
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+            <InfoChip label="Precisión Global" value={`${globalStats.globalAccuracyPct}%`} />
+            <InfoChip label="Respuestas" value={`${globalStats.totalAnsweredAll}`} />
+          </View>
+        )}
+
+        {/* Ranking */}
+        {ranking.length > 0 && (
+          <View style={{ marginBottom: 15 }}>
+            <Text style={[styles.sectionTitle, { fontSize: 16, marginBottom: 8 }]}>Ranking de Velocidad</Text>
+            {ranking.map((entry) => (
+              <View key={entry.studentId} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#eee' }}>
+                <Text style={{ fontWeight: 'bold', width: 30 }}>#{entry.rank}</Text>
+                <Text style={{ flex: 1 }}>{entry.studentName}</Text>
+                <Text style={{ color: palette.muted }}>{(entry.avgResponseMillis / 1000).toFixed(1)}s</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {studentsList.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Esperando estudiantes…</Text>
             <Text style={styles.emptyDescription}>
@@ -190,12 +352,29 @@ export default function RoomDashboard({
             </Text>
           </View>
         ) : (
-          room.students.map((student) => (
-            <View key={student} style={styles.studentRow}>
-              <View style={styles.studentDot} />
-              <Text style={styles.studentName}>{student}</Text>
-            </View>
-          ))
+          studentsList.map((student) => {
+            const monitoringData = monitoredStudents.find(s => s.studentId === student.userId);
+            return (
+              <View key={student.userId} style={styles.studentRow}>
+                <View style={[styles.studentDot, { backgroundColor: monitoringData?.status === 'online' ? palette.mint : palette.muted }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.studentName}>{student.name}</Text>
+                  {monitoringData && (
+                    <Text style={{ fontSize: 12, color: palette.muted }}>
+                      {monitoringData.currentQuestionText ? `Pregunta: ${monitoringData.currentQuestionText}` : 'Esperando...'}
+                      {monitoringData.lastSelectedOptionText && ` - Última: ${monitoringData.lastSelectedOptionText} (${monitoringData.lastIsCorrect ? 'Correcta' : 'Incorrecta'})`}
+                    </Text>
+                  )}
+                </View>
+                {monitoringData && (
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontWeight: 'bold', color: palette.primary }}>{monitoringData.accuracyPct}%</Text>
+                    <Text style={{ fontSize: 10, color: palette.muted }}>{monitoringData.totalCorrect}/{monitoringData.totalAnswered}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })
         )}
       </View>
 
@@ -464,5 +643,87 @@ const styles = StyleSheet.create({
   backText: {
     color: palette.primary,
     fontWeight: "600",
+  },
+  sectionContainer: {
+    marginBottom: 20,
+    gap: 12,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  subTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: palette.text,
+    marginTop: 8,
+  },
+  studentSelector: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  studentChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: palette.surfaceMuted,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  studentChipSelected: {
+    backgroundColor: withAlpha(palette.primary, 0.1),
+    borderColor: palette.primary,
+  },
+  studentChipText: {
+    fontSize: 14,
+    color: palette.text,
+  },
+  studentChipTextSelected: {
+    color: palette.primary,
+    fontWeight: '600',
+  },
+  answerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: withAlpha(palette.border, 0.5),
+  },
+  questionId: {
+    fontSize: 12,
+    color: palette.muted,
+  },
+  answerText: {
+    fontSize: 14,
+    color: palette.text,
+    fontWeight: '500',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: palette.muted,
+    fontStyle: 'italic',
+  },
+  resultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  resultBadgeCorrect: {
+    backgroundColor: withAlpha(palette.mint, 0.15),
+  },
+  resultBadgeIncorrect: {
+    backgroundColor: withAlpha(palette.error, 0.15),
+  },
+  resultText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  resultTextCorrect: {
+    color: palette.mint,
+  },
+  resultTextIncorrect: {
+    color: palette.error,
   },
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { validateRoomCode } from "@/services/useRooms";
+import { API_CONFIG } from "@/config/api";
 import {
   BackHandler,
   Image,
@@ -7,8 +8,8 @@ import {
   ScrollView,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
+  Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -36,6 +37,7 @@ import { palette, withAlpha } from "@/theme/colors";
 import NunitoButton from "@/features/home/components/NunitoButton";
 import WebLayout from "@/features/home/components/WebLayout";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRoomSocket } from "@/hooks/useRoomSocket";
 
 const HOME_TABS = {
   student: "student" as const,
@@ -86,6 +88,7 @@ export default function HomeScreen() {
   const [navigationStack, setNavigationStack] = useState<AppState[]>([]);
   const [activeTab, setActiveTab] = useState<HomeTab>("student");
   const [studentName, setStudentName] = useState("");
+  const [studentId, setStudentId] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [currentTeacher, setCurrentTeacher] = useState<Teacher | null>(null);
   const [currentRoom, setCurrentRoom] = useState<Room | null>(null);
@@ -95,6 +98,24 @@ export default function HomeScreen() {
   const [showRegister, setShowRegister] = useState(false);
   const { user, isAuthenticated, logout } = useAuth();
 
+  // WebSocket Integration for Student
+  const { users: connectedUsers, roomStatus, status: connectionStatus, stompClient } = useRoomSocket({
+    roomId: currentRoom?.id || "",
+    userId: studentId,
+    userName: studentName,
+    enabled: !!currentRoom && activeTab === 'student' && !!studentId,
+  });
+
+  // Effect to handle room status changes for student
+  useEffect(() => {
+    if (activeTab === 'student' && roomStatus === 'STARTED' && appState === 'student-dashboard') {
+      // Auto-start game if room starts
+      // We need to know which game to start. Prioritize the first game in the list.
+      const gameId = currentRoom?.games?.[0]?.id || (currentRoom as any)?.game || "image-word";
+      handleStartGame(gameId);
+    }
+  }, [roomStatus, appState, activeTab, currentRoom]);
+
   const isStudentFormValid = useMemo(
     () => studentName.trim().length > 0 && roomCode.trim().length > 0,
     [studentName, roomCode],
@@ -102,6 +123,7 @@ export default function HomeScreen() {
 
   const resetAppData = useCallback(() => {
     setStudentName("");
+    setStudentId("");
     setRoomCode("");
     setCurrentTeacher(null);
     setCurrentRoom(null);
@@ -124,13 +146,47 @@ export default function HomeScreen() {
     if (!isStudentFormValid) return;
     setIsLoadingRoomCode(true);
     setRoomCodeError("");
-    const exists = await validateRoomCode(roomCode.trim());
+    const roomId = await validateRoomCode(roomCode.trim());
     setIsLoadingRoomCode(false);
-    if (!exists) {
+    if (!roomId) {
       setRoomCodeError("El código de sala no existe. Verifica e intenta nuevamente.");
       return;
     }
-    navigateTo("student-dashboard");
+    // Buscar la sala por código y agregar el estudiante usando el id correcto
+    try {
+      // 1. Buscar la sala por código
+      const resRoom = await fetch(`${API_CONFIG.BASE_URL}/rooms/code/${roomCode.trim()}`);
+      if (!resRoom.ok) {
+        setRoomCodeError("No se encontró la sala. Revisa el código e inténtalo de nuevo.");
+        return;
+      }
+      const room = await resRoom.json();
+      setCurrentRoom(room); // Store room details for student too (needed for socket roomId)
+
+      // 2. Agregar el estudiante usando el id de la sala
+      const resStudent = await fetch(`${API_CONFIG.BASE_URL}/rooms/${room.id}/students`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentName: studentName.trim() })
+      });
+      if (!resStudent.ok) {
+        setRoomCodeError("No se pudo agregar el estudiante a la sala.");
+        return;
+      }
+
+      const studentData = await resStudent.json();
+      // Assuming the backend returns the student object with an id
+      if (studentData && studentData.id) {
+        setStudentId(studentData.id);
+      } else {
+        // Fallback if no ID is returned
+        setStudentId(`temp-${Date.now()}`);
+      }
+
+      navigateTo("student-dashboard");
+    } catch {
+      setRoomCodeError("Error de red. Intenta nuevamente más tarde.");
+    }
   };
 
   const handleStartGame = (gameId: string) => {
@@ -176,6 +232,22 @@ export default function HomeScreen() {
     setCurrentGameId(gameId);
     setDemoMode(true);
     navigateTo("student-game");
+  };
+
+  const handleNextGame = () => {
+    if (!currentRoom || !currentRoom.games || currentRoom.games.length === 0) {
+      handleReset();
+      return;
+    }
+
+    const currentGameIndex = currentRoom.games.findIndex(g => g.id === currentGameId);
+    if (currentGameIndex !== -1 && currentGameIndex < currentRoom.games.length - 1) {
+      const nextGame = currentRoom.games[currentGameIndex + 1];
+      setCurrentGameId(nextGame.id);
+      navigateTo("student-game");
+    } else {
+      handleReset();
+    }
   };
   const insets = useSafeAreaInsets();
   const headerPadding = useMemo(
@@ -396,9 +468,16 @@ export default function HomeScreen() {
     const screen = (
       <StudentDashboard
         studentName={studentName}
+        studentId={studentId}
         roomCode={roomCode}
+        roomId={currentRoom?.id || ""}
+        teacherId={currentRoom?.teacherId}
         onStartGame={handleStartGame}
         onLeaveRoom={handleReset}
+        // Pass socket data
+        connectedUsers={connectedUsers}
+        roomStatus={roomStatus}
+        connectionStatus={connectionStatus}
       />
     );
     return isWeb ? (
@@ -427,6 +506,12 @@ export default function HomeScreen() {
           }
         }}
         onBack={handleReset}
+        // Pass socket client
+        stompClient={stompClient}
+        studentId={studentId}
+        studentName={studentName}
+        roomId={currentRoom?.id}
+        testSuiteId={currentRoom?.testSuiteId}
       />
     );
     return isWeb ? (
@@ -446,6 +531,12 @@ export default function HomeScreen() {
         results={gameResults}
         onPlayAgain={() => navigateTo("student-game")}
         onBackToHome={handleReset}
+        isLastGame={
+          !currentRoom?.games ||
+          currentRoom.games.length === 0 ||
+          currentRoom.games.findIndex(g => g.id === currentGameId) === currentRoom.games.length - 1
+        }
+        onNextGame={handleNextGame}
       />
     );
     return isWeb ? (
@@ -471,9 +562,8 @@ export default function HomeScreen() {
           className="border-b shadow-md"
         >
           <View className="flex-row items-center gap-4">
-            <TouchableOpacity
-              className="flex-row items-center gap-3"
-              activeOpacity={0.85}
+            <Pressable
+              className="flex-row items-center gap-3 active:opacity-70"
               onPress={handleLogoPress}
             >
               <Image
@@ -499,7 +589,7 @@ export default function HomeScreen() {
                   o
                 </Text>
               </Text>
-            </TouchableOpacity>
+            </Pressable>
             <View
               className="h-10 border-l"
               style={{ borderColor: withAlpha(palette.primaryOn, 0.35) }}
@@ -633,10 +723,9 @@ export default function HomeScreen() {
               const theme = gameThemeTokens[game.color];
               const iconName = GAME_ICON_MAP[game.id] ?? "star";
               return (
-                <TouchableOpacity
+                <Pressable
                   key={game.id}
-                  activeOpacity={0.9}
-                  className="rounded-2xl p-5 gap-3 border-2 shadow-lg w-full md:w-[48%] lg:w-[30%] active:scale-95 transition-transform"
+                  className="rounded-2xl p-5 gap-3 border-2 shadow-lg w-full md:w-[48%] lg:w-[30%] active:scale-95 transition-transform active:opacity-90"
                   style={{
                     backgroundColor: theme.container,
                     borderColor: theme.accent,
@@ -673,7 +762,7 @@ export default function HomeScreen() {
                       </Text>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </View>
@@ -718,11 +807,10 @@ interface TabButtonProps {
 
 function TabButton({ label, icon, isActive, onPress }: TabButtonProps) {
   return (
-    <TouchableOpacity
+    <Pressable
       className={`flex-1 items-center py-2.5 rounded-lg ${isActive ? "bg-white shadow-sm" : ""
-        }`}
+        } active:opacity-70`}
       onPress={onPress}
-      activeOpacity={0.9}
     >
       <View className="flex-row items-center gap-2">
         <Feather
@@ -736,7 +824,7 @@ function TabButton({ label, icon, isActive, onPress }: TabButtonProps) {
           {label}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

@@ -14,6 +14,8 @@ interface StudentResultsProps {
   results: GameResults;
   onPlayAgain: () => void;
   onBackToHome: () => void;
+  isLastGame?: boolean;
+  onNextGame?: () => void;
 }
 
 export default function StudentResults({
@@ -22,6 +24,8 @@ export default function StudentResults({
   results,
   onPlayAgain,
   onBackToHome,
+  isLastGame = true,
+  onNextGame,
 }: StudentResultsProps) {
   const gameDefinition = gameDefinitions.find(
     (definition) => definition.id === gameId,
@@ -149,9 +153,8 @@ export default function StudentResults({
           {Array.from({ length: 3 }).map((_, index) => (
             <Text
               key={index}
-              className={`${
-                index < starRating ? "text-yellow-400" : "text-gray-300"
-              }`}
+              className={`${index < starRating ? "text-yellow-400" : "text-gray-300"
+                }`}
               style={{ fontSize: 28, lineHeight: 32 }}
             >
               ★
@@ -184,11 +187,11 @@ export default function StudentResults({
               {stat.value}
             </Text>
           </View>
-          ))}
-        </View>
+        ))}
+      </View>
 
-        <View className="bg-white rounded-3xl p-6 border border-gray-200 shadow space-y-4">
-          <View className="flex-row items-center gap-2">
+      <View className="bg-white rounded-3xl p-6 border border-gray-200 shadow space-y-4">
+        <View className="flex-row items-center gap-2">
           <View className="h-9 w-9 rounded-full items-center justify-center bg-yellow-100">
             <Text className="text-xl">🏅</Text>
           </View>
@@ -250,10 +253,10 @@ export default function StudentResults({
         <NunitoButton
           style={{ flex: 1, padding: 0, backgroundColor: "transparent" }}
           contentStyle={{ minHeight: 48, borderRadius: 12, backgroundColor: theme.accent }}
-          onPress={onPlayAgain}
+          onPress={isLastGame ? onBackToHome : onNextGame}
         >
           <Text className="text-lg font-bold text-center" style={{ color: theme.on }}>
-            ⭐ Jugar de nuevo
+            {isLastGame ? "🏁 Finalizar" : "➡️ Siguiente juego"}
           </Text>
         </NunitoButton>
         <NunitoButton

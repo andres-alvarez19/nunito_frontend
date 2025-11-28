@@ -1,4 +1,5 @@
 import type { GameResults } from '@/features/home/types';
+import type { Question } from '@/models/questions';
 
 export interface GameComponentProps {
   difficulty: 'easy' | 'medium' | 'hard';
@@ -6,4 +7,6 @@ export interface GameComponentProps {
   timeLimit: number;
   onGameComplete: (results: GameResults) => void;
   onExit: () => void;
+  onAnswer?: (questionId: string, questionText: string, selectedOption: string, isCorrect: boolean, elapsedMillis: number) => void;
+  questions?: Question[];
 }

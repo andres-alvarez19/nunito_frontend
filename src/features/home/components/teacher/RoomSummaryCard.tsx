@@ -1,4 +1,7 @@
+import React, { useState } from "react";
 import { Pressable, Text, TouchableOpacity, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import * as Clipboard from 'expo-clipboard';
 
 import { palette, withAlpha } from "@/theme/colors";
 
@@ -25,6 +28,16 @@ export default function RoomSummaryCard({
   onPressDetails,
   onStartActivity,
 }: RoomSummaryCardProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = async () => {
+    if (code) {
+      await Clipboard.setStringAsync(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <Pressable
       className={`flex-1 min-w-[280px] bg-surface rounded-2xl py-5 px-5 border border-border shadow-md gap-4 active:scale-[0.98] transition-transform ${onPressDetails ? "active:border-primary/50 active:shadow-lg hover:shadow-xl" : ""}`}
@@ -37,23 +50,25 @@ export default function RoomSummaryCard({
           {code && (
             <View className="flex-row items-center gap-2 mt-1">
               <Text className="text-xs font-bold text-muted uppercase tracking-wider">CÓDIGO:</Text>
-              <View className="bg-surfaceMuted px-2 py-0.5 rounded border border-border/50">
+              <TouchableOpacity
+                className="flex-row items-center gap-1.5 bg-surfaceMuted px-2 py-0.5 rounded border border-border/50 active:bg-primary/10"
+                onPress={handleCopyCode}
+              >
                 <Text className="text-sm font-mono font-bold text-primary">{code}</Text>
-              </View>
+                <Feather name={copied ? "check" : "copy"} size={12} color={palette.primary} />
+              </TouchableOpacity>
             </View>
           )}
         </View>
-        <View className="px-2.5 py-1 rounded-lg bg-[#4A635F]">
-          <Text className="text-xs text-white font-medium">{gameLabel}</Text>
-        </View>
+
       </View>
 
       <View className="flex-row gap-4">
-        <StatBlock label="Estudiantes" value={students.toString()} />
-        <StatBlock label="Promedio" value={`${average}%`} />
+        <StatBlock label="Estudiantes" value={(students || 0).toString()} />
+        <StatBlock label="Promedio" value={`${average ?? 0}%`} />
         <StatBlock
           label="Completado"
-          value={`${completion}%`}
+          value={`${completion ?? 0}%`}
           accent
         />
       </View>
@@ -61,12 +76,12 @@ export default function RoomSummaryCard({
       <View className="gap-2">
         <View className="flex-row justify-between items-center">
           <Text className="text-sm font-medium text-text">Progreso general</Text>
-          <Text className="text-sm text-muted">{average}%</Text>
+          <Text className="text-sm text-muted">{average ?? 0}%</Text>
         </View>
         <View className="h-2 rounded-full bg-primary/20 overflow-hidden">
           <View
             className="h-full bg-primary"
-            style={{ width: `${Math.max(0, Math.min(100, average))}%` }}
+            style={{ width: `${Math.max(0, Math.min(100, average ?? 0))}%` }}
           />
         </View>
       </View>

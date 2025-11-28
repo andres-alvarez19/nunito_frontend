@@ -8,7 +8,7 @@ export type GameId = "image-word" | "syllable-count" | "rhyme-identification" | 
 export interface BaseQuestion {
     id: string;
     type: GameId;
-    difficulty: Difficulty;
+    // difficulty is now inside options
     hint?: string;
     createdAt: string;
     updatedAt?: string;
@@ -16,31 +16,51 @@ export interface BaseQuestion {
 
 export interface ImageWordQuestion extends BaseQuestion {
     type: "image-word";
-    word: string;
-    imageUrl: string;
-    alternatives: string[];
+    text?: string;
+    options: {
+        word: string;
+        imageUrl: string;
+        alternatives: string[];
+        hint?: string;
+        difficulty?: Difficulty;
+    };
 }
 
 export interface SyllableCountQuestion extends BaseQuestion {
     type: "syllable-count";
-    word: string;
-    syllableCount: number;
-    syllableSeparation: string;
-    alternatives: number[];
+    text?: string;
+    options: {
+        word: string;
+        syllableCount: number;
+        syllableSeparation: string;
+        alternatives: number[];
+        hint?: string;
+        difficulty?: Difficulty;
+    };
 }
 
 export interface RhymeQuestion extends BaseQuestion {
     type: "rhyme-identification";
-    mainWord: string;
-    rhymingWords: string[];
-    nonRhymingWords: string[];
+    text?: string;
+    options: {
+        mainWord: string;
+        rhymingWords: string[];
+        nonRhymingWords: string[];
+        hint?: string;
+        difficulty?: Difficulty;
+    };
 }
 
 export interface AudioQuestion extends BaseQuestion {
     type: "audio-recognition";
-    text: string;
-    audioUrl: string;
-    alternatives: string[];
+    text?: string;
+    options: {
+        word?: string;
+        audioUrl: string;
+        alternatives: string[];
+        hint?: string;
+        difficulty?: Difficulty;
+    };
 }
 
 export type Question =
@@ -49,4 +69,4 @@ export type Question =
     | RhymeQuestion
     | AudioQuestion;
 
-export type CreateQuestionRequest = Omit<Question, "id" | "createdAt" | "updatedAt">;
+export type CreateQuestionRequest = Omit<Question, "id" | "createdAt" | "updatedAt"> & { testSuiteId: string };

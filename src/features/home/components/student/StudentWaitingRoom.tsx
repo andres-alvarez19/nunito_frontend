@@ -6,11 +6,38 @@ interface StudentWaitingRoomProps {
     roomCode: string;
     connectedStudents: string[];
     studentName: string;
+    connectionStatus?: 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
 }
 
-export default function StudentWaitingRoom({ roomCode, connectedStudents, studentName }: StudentWaitingRoomProps) {
+export default function StudentWaitingRoom({ roomCode, connectedStudents, studentName, connectionStatus = 'DISCONNECTED' }: StudentWaitingRoomProps) {
+    const getStatusColor = () => {
+        switch (connectionStatus) {
+            case 'CONNECTED': return 'text-green-600';
+            case 'CONNECTING': return 'text-yellow-600';
+            case 'ERROR': return 'text-red-600';
+            default: return 'text-gray-400';
+        }
+    };
+
+    const getStatusText = () => {
+        switch (connectionStatus) {
+            case 'CONNECTED': return 'Conectado';
+            case 'CONNECTING': return 'Conectando...';
+            case 'ERROR': return 'Error de conexión';
+            default: return 'Desconectado';
+        }
+    };
+
     return (
         <View className="flex-1 items-center justify-center p-6">
+            {/* Connection Status Indicator */}
+            <View className="absolute top-4 right-4 flex-row items-center gap-2 bg-surface px-3 py-1.5 rounded-full border border-border/60 shadow-sm">
+                <View className={`w-2 h-2 rounded-full ${connectionStatus === 'CONNECTED' ? 'bg-green-500' : connectionStatus === 'CONNECTING' ? 'bg-yellow-500' : 'bg-red-500'}`} />
+                <Text className={`text-xs font-bold ${getStatusColor()}`}>
+                    {getStatusText()}
+                </Text>
+            </View>
+
             {/* Pulse Animation Placeholder - Static for now */}
             <View
                 className="w-20 h-20 rounded-full items-center justify-center mb-6"

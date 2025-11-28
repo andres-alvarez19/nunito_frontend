@@ -18,12 +18,20 @@ export interface Room {
   id: string;
   code: string;
   name: string;
-  game: string;
+  games: { id: string; name: string }[];
   difficulty: 'easy' | 'medium' | 'hard';
-  duration: number;
-  teacher: Teacher;
-  students: string[];
+  durationMinutes: number;
   isActive: boolean;
+  status: "pending" | "active" | "finished";
+  testSuiteId: string;
+  createdAt: string;
+  teacherId: string;
+  students: string[];
+  updatedAt: string | null;
+  // Deprecated fields kept for compatibility if needed, or remove if sure
+  game?: string;
+  duration?: number;
+  teacher?: Teacher;
 }
 
 export interface GameResults {
@@ -56,7 +64,8 @@ export type RoomSummaryItem = {
   students: number;
   average: number;
   completion: number;
-  status: "active" | "past";
+  status: "pending" | "active" | "finished";
   studentsResults: StudentResult[];
   code?: string;
+  gameLabels: string[];
 };

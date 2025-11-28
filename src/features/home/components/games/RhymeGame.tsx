@@ -64,7 +64,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplete }: GameComponentProps) {
+export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplete, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.violetContainer,
@@ -73,7 +73,23 @@ export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplet
     }),
     []
   );
-  const questions = useMemo(() => questionBank[difficulty] ?? questionBank.easy, [difficulty]);
+  const questions = useMemo(() => {
+    if (fetchedQuestions && fetchedQuestions.length > 0) {
+      return fetchedQuestions
+        .filter(q => q.type === 'rhyme-identification')
+        .map((q, index) => {
+          if (q.type !== 'rhyme-identification') return null;
+          return {
+            id: parseInt(q.id) || index + 1,
+            keyWord: q.options.mainWord.toUpperCase(),
+            options: [...q.options.rhymingWords, ...q.options.nonRhymingWords].sort(() => Math.random() - 0.5).map(o => o.toUpperCase()),
+            correctRhymes: q.options.rhymingWords.map(r => r.toUpperCase()),
+          };
+        })
+        .filter((q): q is RhymeQuestion => q !== null);
+    }
+    return questionBank[difficulty] ?? questionBank.easy;
+  }, [difficulty, fetchedQuestions]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
