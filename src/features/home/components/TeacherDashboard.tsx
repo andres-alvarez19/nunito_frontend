@@ -56,7 +56,7 @@ export default function TeacherDashboard({
             <View className="flex-row flex-wrap gap-3 mt-2 mb-5">
                 <Pressable
                     onPress={onNavigateToRooms}
-                    className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-accent/30 bg-accent/5 shadow-md grow active:scale-95"
+                    className="flex-1 min-w-full md:min-w-[48%] rounded-2xl py-3.5 px-4 border border-accent/30 bg-accent/5 shadow-md grow active:scale-95"
                 >
                     <Text className="text-[13px] font-semibold text-primary mb-1">
                         Salas activas
@@ -66,7 +66,7 @@ export default function TeacherDashboard({
                     </Text>
                     <Text className="mt-1 text-xs text-muted">sesiones en progreso</Text>
                 </Pressable>
-                <View className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-mintContainer/50 bg-mintContainer/30 shadow-md grow">
+                <View className="flex-1 min-w-full md:min-w-[48%] rounded-2xl py-3.5 px-4 border border-mintContainer/50 bg-mintContainer/30 shadow-md grow">
                     <Text className="text-[13px] font-semibold text-mint mb-1">
                         Estudiantes
                     </Text>
@@ -77,7 +77,7 @@ export default function TeacherDashboard({
                 </View>
                 <Pressable
                     onPress={onNavigateToReports}
-                    className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-violetContainer/50 bg-violetContainer/30 shadow-md grow active:scale-95"
+                    className="flex-1 min-w-full md:min-w-[48%] rounded-2xl py-3.5 px-4 border border-violetContainer/50 bg-violetContainer/30 shadow-md grow active:scale-95"
                 >
                     <Text className="text-[13px] font-semibold text-violet mb-1">
                         Actividades
@@ -89,7 +89,7 @@ export default function TeacherDashboard({
                 </Pressable>
                 <Pressable
                     onPress={onNavigateToReports}
-                    className="flex-1 min-w-[48%] rounded-2xl py-3.5 px-4 border border-blueContainer/50 bg-blueContainer/30 shadow-md grow active:scale-95"
+                    className="flex-1 min-w-full md:min-w-[48%] rounded-2xl py-3.5 px-4 border border-blueContainer/50 bg-blueContainer/30 shadow-md grow active:scale-95"
                 >
                     <Text className="text-[13px] font-semibold text-blue mb-1">
                         Progreso

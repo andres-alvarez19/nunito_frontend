@@ -1193,10 +1193,10 @@ export default function NavigationMenu({
         </View>
       </View>
 
-      <View className="flex-1 flex-row gap-5">
+      <View className="flex-1 flex-col md:flex-row gap-5">
         {userType === "teacher" ? (
           <>
-            <View className="w-[268px] gap-3">
+            <View className="w-full md:w-[268px] gap-3">
               <TeacherSidebar
                 activeSection={activeSection as TeacherSectionId}
                 onSelectSection={(id) => handleSelectSection(id)}
