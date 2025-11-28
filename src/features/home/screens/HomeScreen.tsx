@@ -808,7 +808,7 @@ interface TabButtonProps {
 function TabButton({ label, icon, isActive, onPress }: TabButtonProps) {
   return (
     <Pressable
-      className={`flex-1 items-center py-2.5 rounded-lg ${isActive ? "bg-white shadow-sm" : ""
+      className={`flex-1 items-center py-2.5 rounded-lg ${isActive ? "bg-white" : ""
         } active:opacity-70`}
       onPress={onPress}
     >

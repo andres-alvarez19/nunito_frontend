@@ -33,9 +33,9 @@ export default function NunitoButton({
         accessibilityRole="button"
         onPress={onPress}
         disabled={disabled}
-        className={`min-h-10 w-full self-stretch rounded-lg px-4 py-2 flex-row items-center justify-center gap-2 shadow-md bg-primary border border-primary/20 ${disabled ? "opacity-60" : "opacity-100"} active:opacity-70`}
+        className={`min-h-10 w-full self-stretch rounded-lg px-4 py-2 flex-row items-center justify-center gap-2 bg-primary border border-primary/20 ${disabled ? "opacity-60" : "opacity-100"} active:opacity-70`}
         style={[
-          { elevation: 4 }, // Android shadow
+          // { elevation: 4 }, // Android shadow - Removed for debugging
           contentStyle
         ]}
       >
