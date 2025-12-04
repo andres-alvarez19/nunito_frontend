@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import {
+    Alert,
     Image,
     Pressable,
     ScrollView,
@@ -8,8 +9,7 @@ import {
     View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import * as Clipboard from 'expo-clipboard';
-
+import * as Clipboard from "expo-clipboard";
 
 import {
     gameDefinitions,
@@ -33,7 +33,12 @@ import ProgressBar from "@/features/home/components/teacher/ProgressBar";
 import { palette, withAlpha } from "@/theme/colors";
 import TeacherDashboard from "@/features/home/components/TeacherDashboard";
 import MyRooms from "@/features/home/components/MyRooms";
-import { RoomSummaryItem, StudentResult, DifficultyOption, Room } from "@/features/home/types";
+import {
+    RoomSummaryItem,
+    StudentResult,
+    DifficultyOption,
+    Room,
+} from "@/features/home/types";
 
 import ConnectedUsersList from "@/features/home/components/ConnectedUsersList";
 import TeacherWaitingRoom from "@/features/home/components/teacher/TeacherWaitingRoom";
@@ -158,16 +163,22 @@ const FEEDBACK_OPTIONS = [
 ] as const;
 
 const createDefaultSettings = (): TeacherConfigSettings => ({
-    availableGames: GAME_OPTIONS.reduce<Record<string, boolean>>((acc, option) => {
-        acc[option.id] = true;
-        return acc;
-    }, {}),
+    availableGames: GAME_OPTIONS.reduce<Record<string, boolean>>(
+        (acc, option) => {
+            acc[option.id] = true;
+            return acc;
+        },
+        {},
+    ),
     defaultDifficulty: "easy",
     questionTime: TIME_OPTIONS[0].value,
-    feedback: FEEDBACK_OPTIONS.reduce<Record<string, boolean>>((acc, option) => {
-        acc[option.id] = true;
-        return acc;
-    }, {}),
+    feedback: FEEDBACK_OPTIONS.reduce<Record<string, boolean>>(
+        (acc, option) => {
+            acc[option.id] = true;
+            return acc;
+        },
+        {},
+    ),
 });
 
 export default function NavigationMenu({
@@ -191,18 +202,29 @@ export default function NavigationMenu({
     const [settings, setSettings] = useState<TeacherConfigSettings>(
         () => createDefaultSettings(),
     );
-    const [selectedRoom, setSelectedRoom] = useState<RoomSummaryItem | null>(null);
+    const [selectedRoom, setSelectedRoom] = useState<RoomSummaryItem | null>(
+        null,
+    );
 
     // Question management state
-    const [selectedCourse, setSelectedCourse] = useState<string | undefined>(undefined);
-    const [selectedTestSuite, setSelectedTestSuite] = useState<TestSuite | undefined>(undefined);
-    const [selectedGameEditor, setSelectedGameEditor] = useState<string | undefined>(undefined);
+    const [selectedCourse, setSelectedCourse] = useState<string | undefined>(
+        undefined,
+    );
+    const [selectedTestSuite, setSelectedTestSuite] = useState<
+        TestSuite | undefined
+    >(undefined);
+    const [selectedGameEditor, setSelectedGameEditor] = useState<
+        string | undefined
+    >(undefined);
 
     // Session state
-    const [sessionStatus, setSessionStatus] = useState<"idle" | "waiting" | "live">("idle");
+    const [sessionStatus, setSessionStatus] = useState<
+        "idle" | "waiting" | "live"
+    >("idle");
     const [roomCode, setRoomCode] = useState<string | null>(null);
-    // Removed local connectedUsers state as we use the socket now
-    const [activeSessionRoomId, setActiveSessionRoomId] = useState<string | null>(null);
+    const [activeSessionRoomId, setActiveSessionRoomId] = useState<string | null>(
+        null,
+    );
 
     // Room creation state
     const [isCreatingRoom, setIsCreatingRoom] = useState(false);
@@ -223,16 +245,25 @@ export default function NavigationMenu({
     const { activeRooms, pendingRooms, pastRooms, fetchRooms } = useDashboard();
 
     // WebSocket Integration
-    // Determine which room to connect to: active session room OR selected room details (if active/pending)
     const socketRoomId = useMemo(() => {
         if (activeSessionRoomId) return activeSessionRoomId;
-        if (selectedRoom && (selectedRoom.status === 'active' || selectedRoom.status === 'pending')) {
+        if (
+            selectedRoom &&
+            (selectedRoom.status === "active" ||
+                selectedRoom.status === "pending")
+        ) {
             return selectedRoom.id;
         }
         return null;
     }, [activeSessionRoomId, selectedRoom]);
 
-    const { users: liveConnectedUsers, roomStatus, status: connectionStatus, startActivity, stompClient } = useRoomSocket({
+    const {
+        users: liveConnectedUsers,
+        roomStatus,
+        status: connectionStatus,
+        startActivity,
+        stompClient,
+    } = useRoomSocket({
         roomId: socketRoomId || "",
         userId: user?.id || "teacher-temp-id",
         userName: user?.name || userName || "Profesor",
@@ -240,22 +271,23 @@ export default function NavigationMenu({
         enabled: !!socketRoomId,
     });
 
-    const { students: monitoredStudents, globalStats, ranking } = useRoomMonitoring({
-        roomId: socketRoomId || "",
-        stompClient
-    });
+    const { students: monitoredStudents, globalStats, ranking } =
+        useRoomMonitoring({
+            roomId: socketRoomId || "",
+            stompClient,
+        });
 
     // Effect to handle room status changes desde el socket
     useEffect(() => {
-        if (roomStatus === 'STARTED') {
-            setSessionStatus('live');
+        if (roomStatus === "STARTED") {
+            setSessionStatus("live");
         }
     }, [roomStatus]);
 
     const connectedUserNames = useMemo(() => {
         return liveConnectedUsers
-            .filter(u => u.userId !== user?.id)
-            .map(u => u.name);
+            .filter((u) => u.userId !== user?.id)
+            .map((u) => u.name);
     }, [liveConnectedUsers, user?.id]);
 
     // Fetch rooms when user is teacher
@@ -265,16 +297,13 @@ export default function NavigationMenu({
         }
     }, [userType, user?.id, fetchRooms]);
 
-    // 🔁 Persistencia lógica de la sesión del docente:
-    // Si el docente vuelve y hay salas activas o pendientes en backend,
-    // reconstruimos sessionStatus + activeSessionRoomId.
+    // Persistencia lógica de la sesión del docente
     useEffect(() => {
         if (userType !== "teacher" || !user?.id) return;
 
-        // Si ya hay sesión en memoria, no tocamos nada
         if (sessionStatus !== "idle" || activeSessionRoomId) return;
 
-        // Buscamos primero una sala activa
+        // Buscar sala activa
         const activeRoom =
             activeRooms.find((room) => room.status === "active") || activeRooms[0];
 
@@ -285,7 +314,7 @@ export default function NavigationMenu({
             return;
         }
 
-        // Si no hay activas, revisamos si hay alguna pendiente
+        // Si no hay activas, revisar pendientes
         const waitingRoom =
             pendingRooms.find((room) => room.status === "pending") ||
             pendingRooms[0];
@@ -374,7 +403,9 @@ export default function NavigationMenu({
     const formatSeconds = (seconds: number) => `${seconds.toFixed(1)}s`;
 
     const handleStartActivity = (roomId: string) => {
-        const room = activeRooms.find((r) => r.id === roomId) || pendingRooms.find((r) => r.id === roomId);
+        const room =
+            activeRooms.find((r) => r.id === roomId) ||
+            pendingRooms.find((r) => r.id === roomId);
         if (room) {
             setActiveSessionRoomId(roomId);
             setSessionStatus("waiting");
@@ -382,11 +413,17 @@ export default function NavigationMenu({
     };
 
     const handleLaunchGame = async () => {
-        // In a real app, this would trigger the countdown and then start the game
+        // ✅ No permitir iniciar si no hay estudiantes conectados
+        if (connectedUserNames.length === 0) {
+            Alert.alert(
+                "No hay estudiantes conectados",
+                "Para iniciar la actividad debe haber al menos un estudiante en la sala.",
+            );
+            return;
+        }
+
         if (activeSessionRoomId) {
-            // Notify backend that room is active
-            await updateRoomStatus(activeSessionRoomId, 'active', true);
-            // Start via socket
+            await updateRoomStatus(activeSessionRoomId, "active", true);
             startActivity();
         }
         setSessionStatus("live");
@@ -394,20 +431,31 @@ export default function NavigationMenu({
 
     const handleEndActivity = async () => {
         if (activeSessionRoomId) {
-            // Notify backend that room is finished
-            await updateRoomStatus(activeSessionRoomId, 'finished', false);
+            // Notificar al backend que la sala terminó
+            await updateRoomStatus(activeSessionRoomId, "finished", false);
+
+            // Seleccionar la sala recién finalizada para ver su reporte
+            const finishedRoom =
+                activeRooms.find((r) => r.id === activeSessionRoomId) ||
+                pendingRooms.find((r) => r.id === activeSessionRoomId) ||
+                pastRooms.find((r) => r.id === activeSessionRoomId);
+
+            if (finishedRoom) {
+                setSelectedRoom(finishedRoom);
+            }
         }
         setSessionStatus("idle");
         setActiveSessionRoomId(null);
-        // Optionally navigate to reports or show a summary
         setActiveSection("reports");
-        // Refresh rooms list
         if (user?.id) fetchRooms(user.id);
     };
 
     const renderRoomDetailView = (backTarget: "rooms" | "reports") => {
         if (!selectedRoom) return null;
-        console.log("Detalles de la sala seleccionada:", JSON.stringify(selectedRoom, null, 2));
+        console.log(
+            "Detalles de la sala seleccionada:",
+            JSON.stringify(selectedRoom, null, 2),
+        );
         const difficultyLabel =
             selectedRoom.difficulty === "easy"
                 ? "Fácil"
@@ -417,6 +465,30 @@ export default function NavigationMenu({
         const gameName =
             gameDefinitions.find((g) => g.id === selectedRoom.gameId)?.name ??
             selectedRoom.gameLabel;
+
+        // ✅ Determinar fuente de resultados
+        const hasBackendResults =
+            Array.isArray(selectedRoom.studentsResults) &&
+            selectedRoom.studentsResults.length > 0;
+
+        const shouldUseMonitoringFallback =
+            !hasBackendResults &&
+            monitoredStudents.length > 0 &&
+            socketRoomId &&
+            selectedRoom.id === socketRoomId;
+
+        const effectiveStudentsResults: StudentResult[] = hasBackendResults
+            ? selectedRoom.studentsResults!
+            : shouldUseMonitoringFallback
+                ? monitoredStudents.map((s) => ({
+                    name: s.studentName,
+                    score: Math.round((s.accuracyPct ?? 0) as number),
+                    correctAnswers: s.totalCorrect,
+                    totalQuestions: s.totalAnswered,
+                    averageTime: Math.round((s.avgResponseMillis ?? 0) / 1000),
+                    completedAt: new Date().toISOString(),
+                }))
+                : [];
 
         return (
             <TeacherSectionCard
@@ -433,7 +505,7 @@ export default function NavigationMenu({
                                 borderColor: palette.border,
                                 shadowOpacity: 0,
                                 elevation: 0,
-                            }
+                            },
                         ]}
                         onPress={() => setSelectedRoom(null)}
                     >
@@ -446,14 +518,20 @@ export default function NavigationMenu({
                 <View className="mt-3.5 p-4 rounded-2xl border border-border/80 bg-surface shadow-sm gap-3">
                     <View className="flex-row justify-between items-center gap-3">
                         <View>
-                            <Text className="text-lg font-extrabold text-text">{selectedRoom.title}</Text>
+                            <Text className="text-lg font-extrabold text-text">
+                                {selectedRoom.title}
+                            </Text>
                             <Text className="text-sm text-muted">
                                 {difficultyLabel} • {formatDate(selectedRoom.createdAt)}
                             </Text>
                         </View>
                         <View className="px-2.5 py-1.5 rounded-full bg-primary/10 border border-primary/50">
                             <Text className="text-xs font-bold text-primary">
-                                {selectedRoom.status === "active" ? "Activa" : selectedRoom.status === "pending" ? "Pendiente" : "Finalizada"}
+                                {selectedRoom.status === "active"
+                                    ? "Activa"
+                                    : selectedRoom.status === "pending"
+                                        ? "Pendiente"
+                                        : "Finalizada"}
                             </Text>
                         </View>
                     </View>
@@ -462,7 +540,9 @@ export default function NavigationMenu({
                         {selectedRoom.code && (
                             <View className="w-full p-3 rounded-xl border border-border/70 bg-surfaceMuted flex-row items-center justify-between">
                                 <View>
-                                    <Text className="text-xs text-muted mb-1">Código de sala</Text>
+                                    <Text className="text-xs text-muted mb-1">
+                                        Código de sala
+                                    </Text>
                                     <Text className="text-2xl font-mono font-bold text-primary tracking-widest">
                                         {selectedRoom.code}
                                     </Text>
@@ -502,61 +582,89 @@ export default function NavigationMenu({
                             </Text>
                         </View>
                         <View className="w-full p-3 rounded-xl border border-border/70 bg-surfaceMuted">
-                            <Text className="text-xs text-muted mb-1">Juegos seleccionados</Text>
+                            <Text className="text-xs text-muted mb-1">
+                                Juegos seleccionados
+                            </Text>
                             <View className="flex-row flex-wrap gap-2">
                                 {selectedRoom.gameLabels?.map((label, index) => (
-                                    <View key={index} className="bg-primary/10 px-2 py-1 rounded-md border border-primary/20">
-                                        <Text className="text-sm font-bold text-text">{label}</Text>
+                                    <View
+                                        key={index}
+                                        className="bg-primary/10 px-2 py-1 rounded-md border border-primary/20"
+                                    >
+                                        <Text className="text-sm font-bold text-text">
+                                            {label}
+                                        </Text>
                                     </View>
-                                )) || <Text className="text-lg font-bold text-text">{gameName}</Text>}
+                                )) || (
+                                    <Text className="text-lg font-bold text-text">
+                                        {gameName}
+                                    </Text>
+                                )}
                             </View>
                         </View>
                     </View>
 
                     <View className="gap-2.5">
-                        <Text className="text-base font-bold text-text">Resultados por estudiante</Text>
-                        {(selectedRoom.studentsResults || []).map((student) => (
-                            <View key={student.name} className="border border-border/80 rounded-xl p-3 gap-2.5 bg-surface shadow-sm">
-                                <View className="flex-row justify-between items-center">
-                                    <Text className="text-[15px] font-bold text-text">{student.name}</Text>
-                                    <View className="px-2.5 py-1.5 rounded-full bg-primary/12 border border-primary/60">
-                                        <Text className="font-bold text-primary">{student.score}%</Text>
-                                    </View>
-                                </View>
-                                <View className="flex-row flex-wrap gap-3">
-                                    <View className="flex-1 min-w-[140px] gap-1">
-                                        <Text className="text-xs text-muted">Correctas</Text>
-                                        <Text className="text-sm font-bold text-text">
-                                            {student.correctAnswers}/{student.totalQuestions}
+                        <Text className="text-base font-bold text-text">
+                            Resultados por estudiante
+                        </Text>
+
+                        {effectiveStudentsResults.length === 0 ? (
+                            <Text className="text-sm text-muted">
+                                Aún no hay resultados disponibles para esta sala.
+                            </Text>
+                        ) : (
+                            effectiveStudentsResults.map((student) => (
+                                <View
+                                    key={student.name}
+                                    className="border border-border/80 rounded-xl p-3 gap-2.5 bg-surface shadow-sm"
+                                >
+                                    <View className="flex-row justify-between items-center">
+                                        <Text className="text-[15px] font-bold text-text">
+                                            {student.name}
                                         </Text>
+                                        <View className="px-2.5 py-1.5 rounded-full bg-primary/12 border border-primary/60">
+                                            <Text className="font-bold text-primary">
+                                                {student.score}%
+                                            </Text>
+                                        </View>
                                     </View>
-                                    <View className="flex-1 min-w-[140px] gap-1">
-                                        <Text className="text-xs text-muted">Tiempo prom.</Text>
-                                        <Text className="text-sm font-bold text-text">
-                                            {formatSeconds(student.averageTime)}
-                                        </Text>
-                                    </View>
-                                    <View className="flex-1 min-w-[140px] gap-1">
-                                        <Text className="text-xs text-muted">Completado</Text>
-                                        <Text className="text-sm font-bold text-text">
-                                            {formatDate(student.completedAt)}
-                                        </Text>
-                                    </View>
-                                    <View className="flex-1 min-w-[140px] gap-1">
-                                        <Text className="text-xs text-muted">Progreso</Text>
-                                        <View className="h-1.5 rounded-full bg-primary/18 overflow-hidden">
-                                            <View
-                                                className="h-full bg-primary"
-                                                style={{ width: `${student.score}%` }}
-                                            />
+                                    <View className="flex-row flex-wrap gap-3">
+                                        <View className="flex-1 min-w-[140px] gap-1">
+                                            <Text className="text-xs text-muted">Correctas</Text>
+                                            <Text className="text-sm font-bold text-text">
+                                                {student.correctAnswers}/{student.totalQuestions}
+                                            </Text>
+                                        </View>
+                                        <View className="flex-1 min-w-[140px] gap-1">
+                                            <Text className="text-xs text-muted">Tiempo prom.</Text>
+                                            <Text className="text-sm font-bold text-text">
+                                                {formatSeconds(student.averageTime)}
+                                            </Text>
+                                        </View>
+                                        <View className="flex-1 min-w-[140px] gap-1">
+                                            <Text className="text-xs text-muted">Completado</Text>
+                                            <Text className="text-sm font-bold text-text">
+                                                {formatDate(student.completedAt)}
+                                            </Text>
+                                        </View>
+                                        <View className="flex-1 min-w-[140px] gap-1">
+                                            <Text className="text-xs text-muted">Progreso</Text>
+                                            <View className="h-1.5 rounded-full bg-primary/18 overflow-hidden">
+                                                <View
+                                                    className="h-full bg-primary"
+                                                    style={{ width: `${student.score}%` }}
+                                                />
+                                            </View>
                                         </View>
                                     </View>
                                 </View>
-                            </View>
-                        ))}
+                            ))
+                        )}
                     </View>
 
-                    {(selectedRoom.status === "active" || selectedRoom.status === "pending") && (
+                    {(selectedRoom.status === "active" ||
+                        selectedRoom.status === "pending") && (
                         <View className="mt-4">
                             <ConnectedUsersList
                                 connectedUsers={connectedUserNames}
@@ -567,7 +675,9 @@ export default function NavigationMenu({
                                     className="h-12 rounded-xl bg-primary items-center justify-center shadow-md active:opacity-90"
                                     onPress={() => handleStartActivity(selectedRoom.id)}
                                 >
-                                    <Text className="text-base font-bold text-primaryOn">Iniciar Actividad</Text>
+                                    <Text className="text-base font-bold text-primaryOn">
+                                        Iniciar Actividad
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -580,7 +690,9 @@ export default function NavigationMenu({
     const renderTeacherSection = () => {
         // Handle active session views
         if (sessionStatus === "waiting" && activeSessionRoomId) {
-            const room = activeRooms.find((r) => r.id === activeSessionRoomId) || pendingRooms.find((r) => r.id === activeSessionRoomId);
+            const room =
+                activeRooms.find((r) => r.id === activeSessionRoomId) ||
+                pendingRooms.find((r) => r.id === activeSessionRoomId);
             if (room) {
                 return (
                     <TeacherWaitingRoom
@@ -601,7 +713,9 @@ export default function NavigationMenu({
         }
 
         if (sessionStatus === "live" && activeSessionRoomId) {
-            const room = activeRooms.find((r) => r.id === activeSessionRoomId) || pendingRooms.find((r) => r.id === activeSessionRoomId);
+            const room =
+                activeRooms.find((r) => r.id === activeSessionRoomId) ||
+                pendingRooms.find((r) => r.id === activeSessionRoomId);
             if (room) {
                 return (
                     <TeacherLiveSession
@@ -619,7 +733,7 @@ export default function NavigationMenu({
                                 totalCorrectAll: 0,
                                 globalAccuracyPct: 0,
                             },
-                            ranking: ranking
+                            ranking: ranking,
                         }}
                         onEndActivity={handleEndActivity}
                     />
@@ -645,7 +759,6 @@ export default function NavigationMenu({
                     return renderRoomDetailView("rooms");
                 }
 
-                // Show room creation flow
                 if (isCreatingRoom) {
                     return (
                         <RoomCreationFlow
@@ -654,14 +767,15 @@ export default function NavigationMenu({
                             onRoomCreated={(newRoom: Room) => {
                                 console.log("Nueva sala creada:", newRoom);
                                 setIsCreatingRoom(false);
-                                // Add new room to pendingRooms so it appears immediately
                                 if (typeof pendingRooms !== "undefined") {
-                                    // Transform Room to RoomSummaryItem for immediate display
                                     const now = new Date();
                                     const summary: RoomSummaryItem = {
                                         id: newRoom.id,
                                         title: newRoom.name,
-                                        gameLabel: newRoom.game ? (gameDefinitions.find(def => def.id === newRoom.game)?.name || newRoom.game) : "Sin juegos",
+                                        gameLabel: newRoom.game
+                                            ? gameDefinitions.find((def) => def.id === newRoom.game)
+                                            ?.name || newRoom.game
+                                            : "Sin juegos",
                                         gameId: (newRoom.game as any) || "image-word",
                                         difficulty: newRoom.difficulty,
                                         createdAt: now.toISOString(),
@@ -673,9 +787,16 @@ export default function NavigationMenu({
                                         studentsResults: [],
                                         code: newRoom.code,
                                         gameLabels: (newRoom as any).games
-                                            ? (newRoom as any).games.map((gId: string) => gameDefinitions.find(def => def.id === gId)?.name || gId)
+                                            ? (newRoom as any).games.map((gId: string) =>
+                                                gameDefinitions.find((def) => def.id === gId)?.name ||
+                                                gId,
+                                            )
                                             : newRoom.game
-                                                ? [gameDefinitions.find(def => def.id === newRoom.game)?.name || newRoom.game]
+                                                ? [
+                                                    gameDefinitions.find(
+                                                        (def) => def.id === newRoom.game,
+                                                    )?.name || newRoom.game,
+                                                ]
                                                 : ["Sin juegos"],
                                     };
                                     pendingRooms.push(summary);
@@ -690,7 +811,6 @@ export default function NavigationMenu({
                     );
                 }
 
-                // Show room list
                 return (
                     <MyRooms
                         activeRooms={activeRooms}
@@ -712,13 +832,19 @@ export default function NavigationMenu({
                     >
                         <View className="flex-row gap-3 mt-2 mb-3">
                             <View className="px-3.5 py-1.5 rounded-xl bg-surfaceMuted border border-border/90">
-                                <Text className="text-sm font-medium text-text">Todos los juegos</Text>
+                                <Text className="text-sm font-medium text-text">
+                                    Todos los juegos
+                                </Text>
                             </View>
                             <View className="px-3.5 py-1.5 rounded-xl bg-surfaceMuted border border-border/90">
-                                <Text className="text-sm font-medium text-text">Última semana</Text>
+                                <Text className="text-sm font-medium text-text">
+                                    Última semana
+                                </Text>
                             </View>
                             <View className="px-3.5 py-1.5 rounded-xl bg-surfaceMuted border border-border/90">
-                                <Text className="text-sm font-medium text-text">Exportar todo</Text>
+                                <Text className="text-sm font-medium text-text">
+                                    Exportar todo
+                                </Text>
                             </View>
                         </View>
                         <View className="flex-row flex-wrap gap-4">
@@ -802,10 +928,22 @@ export default function NavigationMenu({
                                     <View className="flex-row flex-wrap gap-3">
                                         {(selectedTestSuite.games || []).map((gameId) => {
                                             const game = [
-                                                { id: "image-word", title: "Asociación Imagen-Palabra" },
-                                                { id: "syllable-count", title: "Conteo de Sílabas" },
-                                                { id: "rhyme-identification", title: "Identificación de Rimas" },
-                                                { id: "audio-recognition", title: "Reconocimiento Auditivo" },
+                                                {
+                                                    id: "image-word",
+                                                    title: "Asociación Imagen-Palabra",
+                                                },
+                                                {
+                                                    id: "syllable-count",
+                                                    title: "Conteo de Sílabas",
+                                                },
+                                                {
+                                                    id: "rhyme-identification",
+                                                    title: "Identificación de Rimas",
+                                                },
+                                                {
+                                                    id: "audio-recognition",
+                                                    title: "Reconocimiento Auditivo",
+                                                },
                                             ].find((g) => g.id === gameId);
                                             return (
                                                 <Pressable
@@ -859,26 +997,38 @@ export default function NavigationMenu({
                         <View className="gap-3">
                             <View className="flex-row justify-between py-2 border-b border-border/70">
                                 <Text className="text-sm font-semibold text-muted">Nombre</Text>
-                                <Text className="text-base font-semibold text-text">{userName}</Text>
+                                <Text className="text-base font-semibold text-text">
+                                    {userName}
+                                </Text>
                             </View>
                             <View className="flex-row justify-between py-2 border-b border-border/70">
                                 <Text className="text-sm font-semibold text-muted">Correo</Text>
-                                <Text className="text-base font-semibold text-text">{user?.email || "N/A"}</Text>
+                                <Text className="text-base font-semibold text-text">
+                                    {user?.email || "N/A"}
+                                </Text>
                             </View>
                             <View className="flex-row justify-between py-2 border-b border-border/70">
-                                <Text className="text-sm font-semibold text-muted">Tipo de usuario</Text>
-                                <Text className="text-base font-semibold text-text">Profesor</Text>
+                                <Text className="text-sm font-semibold text-muted">
+                                    Tipo de usuario
+                                </Text>
+                                <Text className="text-base font-semibold text-text">
+                                    Profesor
+                                </Text>
                             </View>
                         </View>
 
                         <View className="mt-5 p-5 rounded-2xl border border-border/80 bg-surface shadow-sm">
-                            <Text className="text-lg font-bold text-text mb-1">Configuración de juegos</Text>
+                            <Text className="text-lg font-bold text-text mb-1">
+                                Configuración de juegos
+                            </Text>
                             <Text className="text-sm text-muted mb-5">
                                 Personaliza los juegos educativos para tus salas
                             </Text>
 
                             <View className="mb-6">
-                                <Text className="text-base font-semibold text-text mb-1">Juegos disponibles</Text>
+                                <Text className="text-base font-semibold text-text mb-1">
+                                    Juegos disponibles
+                                </Text>
                                 <Text className="text-sm text-muted mb-3">
                                     Selecciona qué juegos deseas usar en tus salas
                                 </Text>
@@ -892,12 +1042,22 @@ export default function NavigationMenu({
                                                 onPress={() => handleToggleGame(option.id)}
                                                 accessibilityRole="checkbox"
                                                 accessibilityState={{ checked: isChecked }}
-                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${isChecked ? "bg-primary/5 border-primary" : "bg-surface border-border/60"} hover:bg-surfaceMuted active:bg-surfaceMuted`}
+                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${
+                                                    isChecked
+                                                        ? "bg-primary/5 border-primary"
+                                                        : "bg-surface border-border/60"
+                                                } hover:bg-surfaceMuted active:bg-surfaceMuted`}
                                             >
                                                 <View
-                                                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${isChecked ? "bg-primary border-primary" : "bg-surface border-muted"}`}
+                                                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${
+                                                        isChecked
+                                                            ? "bg-primary border-primary"
+                                                            : "bg-surface border-muted"
+                                                    }`}
                                                 >
-                                                    {isChecked ? <View className="w-2.5 h-2.5 bg-white rounded-sm" /> : null}
+                                                    {isChecked ? (
+                                                        <View className="w-2.5 h-2.5 bg-white rounded-sm" />
+                                                    ) : null}
                                                 </View>
                                                 <View className="flex-1 gap-0.5">
                                                     <Text className="text-base font-semibold text-text">
@@ -923,23 +1083,40 @@ export default function NavigationMenu({
 
                                 <View className="gap-2">
                                     {DIFFICULTY_OPTIONS.map((option) => {
-                                        const isSelected = settings.defaultDifficulty === option.id;
+                                        const isSelected =
+                                            settings.defaultDifficulty === option.id;
                                         return (
                                             <Pressable
                                                 key={option.id}
                                                 accessibilityRole="radio"
                                                 accessibilityState={{ selected: isSelected }}
                                                 onPress={() => handleSelectDifficulty(option.id)}
-                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${isSelected ? "bg-primary/5 border-primary" : "bg-surface border-border/60"} hover:bg-surfaceMuted active:bg-surfaceMuted`}
+                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${
+                                                    isSelected
+                                                        ? "bg-primary/5 border-primary"
+                                                        : "bg-surface border-border/60"
+                                                } hover:bg-surfaceMuted active:bg-surfaceMuted`}
                                             >
                                                 <View
-                                                    className={`w-5 h-5 rounded-full border mr-3 items-center justify-center ${isSelected ? "border-primary" : "border-muted"}`}
+                                                    className={`w-5 h-5 rounded-full border mr-3 items-center justify-center ${
+                                                        isSelected ? "border-primary" : "border-muted"
+                                                    }`}
                                                 >
-                                                    {isSelected ? <View className="w-2.5 h-2.5 bg-primary rounded-full" /> : null}
+                                                    {isSelected ? (
+                                                        <View className="w-2.5 h-2.5 bg-primary rounded-full" />
+                                                    ) : null}
                                                 </View>
                                                 <View className="flex-1 gap-0.5">
                                                     <Text
-                                                        className={`text-base font-semibold ${option.textStyle === "easyText" ? "text-green-600" : option.textStyle === "mediumText" ? "text-blue-600" : option.textStyle === "hardText" ? "text-red-600" : "text-text"}`}
+                                                        className={`text-base font-semibold ${
+                                                            option.textStyle === "easyText"
+                                                                ? "text-green-600"
+                                                                : option.textStyle === "mediumText"
+                                                                    ? "text-blue-600"
+                                                                    : option.textStyle === "hardText"
+                                                                        ? "text-red-600"
+                                                                        : "text-text"
+                                                        }`}
                                                     >
                                                         {option.title}
                                                     </Text>
@@ -954,7 +1131,9 @@ export default function NavigationMenu({
                             </View>
 
                             <View className="mb-6 pt-5 border-t border-border/60">
-                                <Text className="text-base font-semibold text-text mb-1">Tiempo por pregunta</Text>
+                                <Text className="text-base font-semibold text-text mb-1">
+                                    Tiempo por pregunta
+                                </Text>
                                 <Text className="text-sm text-muted mb-3">
                                     Define el tiempo límite en segundos
                                 </Text>
@@ -968,12 +1147,20 @@ export default function NavigationMenu({
                                                 accessibilityRole="radio"
                                                 accessibilityState={{ selected: isSelected }}
                                                 onPress={() => handleSelectTime(option.value)}
-                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${isSelected ? "bg-primary/5 border-primary" : "bg-surface border-border/60"} hover:bg-surfaceMuted active:bg-surfaceMuted`}
+                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${
+                                                    isSelected
+                                                        ? "bg-primary/5 border-primary"
+                                                        : "bg-surface border-border/60"
+                                                } hover:bg-surfaceMuted active:bg-surfaceMuted`}
                                             >
                                                 <View
-                                                    className={`w-5 h-5 rounded-full border mr-3 items-center justify-center ${isSelected ? "border-primary" : "border-muted"}`}
+                                                    className={`w-5 h-5 rounded-full border mr-3 items-center justify-center ${
+                                                        isSelected ? "border-primary" : "border-muted"
+                                                    }`}
                                                 >
-                                                    {isSelected ? <View className="w-2.5 h-2.5 bg-primary rounded-full" /> : null}
+                                                    {isSelected ? (
+                                                        <View className="w-2.5 h-2.5 bg-primary rounded-full" />
+                                                    ) : null}
                                                 </View>
                                                 <View className="flex-1 gap-0.5">
                                                     <Text className="text-base font-semibold text-text">
@@ -1006,12 +1193,22 @@ export default function NavigationMenu({
                                                 accessibilityRole="checkbox"
                                                 accessibilityState={{ checked: isChecked }}
                                                 onPress={() => handleToggleFeedback(option.id)}
-                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${isChecked ? "bg-primary/5 border-primary" : "bg-surface border-border/60"} hover:bg-surfaceMuted active:bg-surfaceMuted`}
+                                                className={`flex-row items-center p-3 rounded-xl border transition-all ${
+                                                    isChecked
+                                                        ? "bg-primary/5 border-primary"
+                                                        : "bg-surface border-border/60"
+                                                } hover:bg-surfaceMuted active:bg-surfaceMuted`}
                                             >
                                                 <View
-                                                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${isChecked ? "bg-primary border-primary" : "bg-surface border-muted"}`}
+                                                    className={`w-5 h-5 rounded border mr-3 items-center justify-center ${
+                                                        isChecked
+                                                            ? "bg-primary border-primary"
+                                                            : "bg-surface border-muted"
+                                                    }`}
                                                 >
-                                                    {isChecked ? <View className="w-2.5 h-2.5 bg-white rounded-sm" /> : null}
+                                                    {isChecked ? (
+                                                        <View className="w-2.5 h-2.5 bg-white rounded-sm" />
+                                                    ) : null}
                                                 </View>
                                                 <View className="flex-1 gap-0.5">
                                                     <Text className="text-base font-semibold text-text">
@@ -1030,26 +1227,40 @@ export default function NavigationMenu({
 
                         <View className="mt-4 flex-row gap-2.5">
                             <NunitoButton
-                                style={{ flex: 1, width: "auto", backgroundColor: "transparent", padding: 0 }}
+                                style={{
+                                    flex: 1,
+                                    width: "auto",
+                                    backgroundColor: "transparent",
+                                    padding: 0,
+                                }}
                                 contentStyle={[
                                     {
                                         backgroundColor: palette.primary,
                                         opacity: !hasChanges ? 0.5 : 1,
                                         shadowOpacity: 0,
                                         elevation: 0,
-                                    }
+                                    },
                                 ]}
                                 disabled={!hasChanges}
                                 onPress={handleSaveSettings}
                             >
                                 <Text
-                                    className={`text-sm font-semibold ${!hasChanges ? "text-primaryOn/80" : "text-primaryOn"}`}
+                                    className={`text-sm font-semibold ${
+                                        !hasChanges
+                                            ? "text-primaryOn/80"
+                                            : "text-primaryOn"
+                                    }`}
                                 >
                                     Guardar configuración
                                 </Text>
                             </NunitoButton>
                             <NunitoButton
-                                style={{ flex: 1, width: "auto", backgroundColor: "transparent", padding: 0 }}
+                                style={{
+                                    flex: 1,
+                                    width: "auto",
+                                    backgroundColor: "transparent",
+                                    padding: 0,
+                                }}
                                 contentStyle={[
                                     {
                                         backgroundColor: palette.surface,
@@ -1057,7 +1268,7 @@ export default function NavigationMenu({
                                         borderColor: palette.border,
                                         shadowOpacity: 0,
                                         elevation: 0,
-                                    }
+                                    },
                                 ]}
                                 onPress={handleResetDefaults}
                             >
@@ -1079,7 +1290,11 @@ export default function NavigationMenu({
                                 }}
                             >
                                 <View className="flex-row items-center gap-2">
-                                    <Feather name="log-out" size={18} color={palette.primaryOn} />
+                                    <Feather
+                                        name="log-out"
+                                        size={18}
+                                        color={palette.primaryOn}
+                                    />
                                     <Text className="text-base font-bold text-primaryOn">
                                         Cerrar Sesión
                                     </Text>
@@ -1092,8 +1307,7 @@ export default function NavigationMenu({
     };
 
     const renderStudentSection = () => {
-        // If session is waiting, show Waiting Room
-        if (sessionStatus === 'waiting') {
+        if (sessionStatus === "waiting") {
             return (
                 <StudentWaitingRoom
                     roomCode={roomCode || "----"}
@@ -1104,13 +1318,12 @@ export default function NavigationMenu({
             );
         }
 
-        // If session is live, show Game Start / Active Lobby
-        if (sessionStatus === 'live') {
+        if (sessionStatus === "live") {
             return (
                 <StudentGameStart
-                    gameName="Asociación Imagen-Palabra" // Placeholder, should come from session data
-                    difficulty="Fácil" // Placeholder
-                    timeLimit={600} // Placeholder
+                    gameName="Asociación Imagen-Palabra" // Placeholder
+                    difficulty="Fácil"
+                    timeLimit={600}
                     onStart={() => {
                         console.log("Start Game Pressed");
                     }}
@@ -1122,7 +1335,9 @@ export default function NavigationMenu({
             case "games":
                 return (
                     <View className="gap-4">
-                        <Text className="text-[22px] font-bold text-text">Juegos disponibles</Text>
+                        <Text className="text-[22px] font-bold text-text">
+                            Juegos disponibles
+                        </Text>
                         <Text className="text-[15px] text-muted">
                             Explora los mini juegos que podrás disfrutar con tu curso.
                         </Text>
@@ -1157,30 +1372,49 @@ export default function NavigationMenu({
             default:
                 return (
                     <View className="gap-4">
-                        <Text className="text-[22px] font-bold text-text">Panel del Estudiante</Text>
+                        <Text className="text-[22px] font-bold text-text">
+                            Panel del Estudiante
+                        </Text>
                         <Text className="text-[15px] text-muted">
                             Ingresa el código de tu sala y prepárate para divertirte
                             aprendiendo con tus compañeros.
                         </Text>
                         <View className="mt-1.5 p-2.5 rounded-xl bg-background/70">
-                            <Text className="text-sm font-semibold text-text mb-1">¿Listo para jugar?</Text>
+                            <Text className="text-sm font-semibold text-text mb-1">
+                                ¿Listo para jugar?
+                            </Text>
                             <Text className="text-xs text-muted">
                                 Pídele a tu profesor el código de la sala y selecciónalo desde
                                 la pantalla principal.
                             </Text>
                         </View>
 
-                        {/* Temporary Debug Controls for Student Flow */}
+                        {/* Debug controls (puedes quitarlos en prod) */}
                         <View className="mt-4 p-4 bg-gray-100 rounded-lg">
                             <Text className="font-bold mb-2">Debug Controls:</Text>
                             <View className="flex-row gap-2">
-                                <TouchableOpacity onPress={() => { setSessionStatus('waiting'); setRoomCode('ABC-123'); }} className="bg-blue-500 px-3 py-2 rounded">
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSessionStatus("waiting");
+                                        setRoomCode("ABC-123");
+                                    }}
+                                    className="bg-blue-500 px-3 py-2 rounded"
+                                >
                                     <Text className="text-white">Simulate Join Room</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => setSessionStatus('live')} className="bg-green-500 px-3 py-2 rounded">
+                                <TouchableOpacity
+                                    onPress={() => setSessionStatus("live")}
+                                    className="bg-green-500 px-3 py-2 rounded"
+                                >
                                     <Text className="text-white">Simulate Game Start</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => { setSessionStatus('idle'); setRoomCode(null); }} className="bg-red-500 px-3 py-2 rounded">
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSessionStatus("idle");
+                                        setRoomCode(null);
+                                    }}
+                                    className="bg-red-500 px-3 py-2 rounded"
+                                >
                                     <Text className="text-white">Reset</Text>
                                 </TouchableOpacity>
                             </View>
@@ -1191,27 +1425,32 @@ export default function NavigationMenu({
     };
 
     return (
-
         <ScrollView
             className="flex-1 bg-background"
             contentContainerStyle={{ padding: 24, gap: 20, flexGrow: 1 }}
         >
-            <View className="bg-surface rounded-[20px] p-5 shadow-sm" style={{ elevation: 2 }}>
+            <View
+                className="bg-surface rounded-[20px] p-5 shadow-sm"
+                style={{ elevation: 2 }}
+            >
                 <View className="flex-row items-center gap-4">
                     <Image
                         source={require("../../../../assets/images/nunito_logo.png")}
                         style={{ width: 120, height: 40 }}
                         resizeMode="contain"
                     />
-                    {/* Separator removed */}
                     <View className="flex-1 gap-1 ml-2">
-                        <Text className="text-[22px] font-bold text-text">Hola, {userName}</Text>
+                        <Text className="text-[22px] font-bold text-text">
+                            Hola, {userName}
+                        </Text>
                         <Text className="text-sm text-muted">
                             {userType === "teacher" ? "Profesor" : "Estudiante"} de Nunito
                         </Text>
                     </View>
                     <View
-                        className={`px-3.5 py-2 rounded-full ${userType === "teacher" ? "bg-primary/12" : "bg-accent/18"}`}
+                        className={`px-3.5 py-2 rounded-full ${
+                            userType === "teacher" ? "bg-primary/12" : "bg-accent/18"
+                        }`}
                     >
                         <Text className="text-[13px] font-semibold text-text">
                             {userType === "teacher" ? "Profesor" : "Estudiante"}
@@ -1237,7 +1476,9 @@ export default function NavigationMenu({
                             className="flex-1"
                             contentContainerStyle={{ paddingBottom: 32 }}
                         >
-                            <View className="flex-1 bg-surface rounded-[20px] border border-border p-5 shadow-sm">{renderTeacherSection()}</View>
+                            <View className="flex-1 bg-surface rounded-[20px] border border-border p-5 shadow-sm">
+                                {renderTeacherSection()}
+                            </View>
                         </ScrollView>
                     </>
                 ) : (
@@ -1248,16 +1489,24 @@ export default function NavigationMenu({
                                 return (
                                     <TouchableOpacity
                                         key={item.id}
-                                        className={`py-3 px-3.5 rounded-[14px] border gap-1 ${isActive ? "bg-primary/12 border-primary" : "bg-surface border-border/90"}`}
+                                        className={`py-3 px-3.5 rounded-[14px] border gap-1 ${
+                                            isActive
+                                                ? "bg-primary/12 border-primary"
+                                                : "bg-surface border-border/90"
+                                        }`}
                                         onPress={() => handleSelectSection(item.id)}
                                     >
                                         <Text
-                                            className={`text-base font-semibold ${isActive ? "text-primary" : "text-text"}`}
+                                            className={`text-base font-semibold ${
+                                                isActive ? "text-primary" : "text-text"
+                                            }`}
                                         >
                                             {item.label}
                                         </Text>
                                         <Text
-                                            className={`text-[13px] ${isActive ? "text-primary/80" : "text-muted"}`}
+                                            className={`text-[13px] ${
+                                                isActive ? "text-primary/80" : "text-muted"
+                                            }`}
                                         >
                                             {item.description}
                                         </Text>
@@ -1271,7 +1520,9 @@ export default function NavigationMenu({
                                     onLogout();
                                 }}
                             >
-                                <Text className="text-primary font-semibold text-[15px]">Cerrar sesión</Text>
+                                <Text className="text-primary font-semibold text-[15px]">
+                                    Cerrar sesión
+                                </Text>
                             </TouchableOpacity>
                         </View>
 
@@ -1279,7 +1530,9 @@ export default function NavigationMenu({
                             className="flex-1"
                             contentContainerStyle={{ paddingBottom: 32 }}
                         >
-                            <View className="flex-1 bg-surface rounded-[20px] border border-border p-5 shadow-sm">{renderStudentSection()}</View>
+                            <View className="flex-1 bg-surface rounded-[20px] border border-border p-5 shadow-sm">
+                                {renderStudentSection()}
+                            </View>
                         </ScrollView>
                     </>
                 )}

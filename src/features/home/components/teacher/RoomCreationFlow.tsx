@@ -6,6 +6,7 @@ import {
     TextInput,
     View,
     ActivityIndicator,
+    Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
@@ -55,13 +56,21 @@ const DURATIONS = [
     { value: 30, label: "30 min" },
 ];
 
+// 🔍 Helper: el suite es compatible sólo si tiene EXACTAMENTE
+// los mismos juegos que el profesor seleccionó (mismo set).
+const haveSameGameSet = (suiteGames: string[], selectedGames: string[]) => {
+    if (suiteGames.length !== selectedGames.length) return false;
+    const selectedSet = new Set(selectedGames);
+    return suiteGames.every((g) => selectedSet.has(g));
+};
+
 export default function RoomCreationFlow({
-    teacherName,
-    teacherEmail,
-    onRoomCreated,
-    onCancel,
-    onNavigateToQuestions,
-}: RoomCreationFlowProps) {
+                                             teacherName,
+                                             teacherEmail,
+                                             onRoomCreated,
+                                             onCancel,
+                                             onNavigateToQuestions,
+                                         }: RoomCreationFlowProps) {
     const { user } = useAuth();
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [selectedCourseId, setSelectedCourseId] = useState<string>("");
@@ -74,9 +83,14 @@ export default function RoomCreationFlow({
     const [selectedTestSuite, setSelectedTestSuite] = useState<string>("");
     const [isCreating, setIsCreating] = useState(false);
 
+    // flags para mostrar mensajes de error en UI
+    const [showStep1Errors, setShowStep1Errors] = useState(false);
+    const [showStep2Errors, setShowStep2Errors] = useState(false);
+
     // Hooks
     const { courses, loading: coursesLoading, fetchCourses } = useCourses();
-    const { testSuites, loading: testSuitesLoading, fetchTestSuites } = useTestSuites();
+    const { testSuites, loading: testSuitesLoading, fetchTestSuites } =
+        useTestSuites();
 
     // Fetch courses on mount
     useEffect(() => {
@@ -106,28 +120,65 @@ export default function RoomCreationFlow({
         }
     };
 
-    const generateRoomCode = () => {
-        return Math.random().toString(36).substring(2, 8).toUpperCase();
+    const showValidationError = (message: string) => {
+        Alert.alert("Información incompleta", message);
     };
 
     const handleContinueToRoomConfig = () => {
+        if (!selectedCourseId) {
+            setShowStep1Errors(true);
+            showValidationError("Debes seleccionar un curso para continuar.");
+            return;
+        }
+        setShowStep1Errors(false);
         setStep(2);
     };
 
     const handleContinueToTestSuiteSelection = () => {
+        const errors: string[] = [];
+        if (!roomConfig.name.trim()) {
+            errors.push("• Ingresa un nombre para la sala.");
+        }
+        if (roomConfig.games.length === 0) {
+            errors.push("• Selecciona al menos un juego.");
+        }
+        if (!roomConfig.difficulty) {
+            errors.push("• Selecciona un nivel de dificultad.");
+        }
+
+        if (errors.length > 0) {
+            setShowStep2Errors(true);
+            showValidationError(errors.join("\n"));
+            return;
+        }
+
+        setShowStep2Errors(false);
         setStep(3);
     };
 
     const handleCreateRoom = async () => {
-        if (!selectedTestSuite || !user?.id) return;
+        if (!selectedTestSuite) {
+            showValidationError(
+                "Debes seleccionar un conjunto de preguntas para crear la sala.",
+            );
+            return;
+        }
+
+        if (!user?.id) {
+            showValidationError(
+                "No se ha encontrado información del profesor. Intenta volver a iniciar sesión.",
+            );
+            return;
+        }
 
         setIsCreating(true);
 
         try {
-            // Ensure duration is a valid number
-            const duration = typeof roomConfig.duration === 'number' && roomConfig.duration > 0
-                ? roomConfig.duration
-                : 10;
+            // Asegurar duración válida
+            const duration =
+                typeof roomConfig.duration === "number" && roomConfig.duration > 0
+                    ? roomConfig.duration
+                    : 10;
 
             const newRoom = await createRoom({
                 teacherId: user.id,
@@ -138,15 +189,27 @@ export default function RoomCreationFlow({
                 testSuiteId: selectedTestSuite,
             });
 
-            const roomWithGames = {
+            // 🔧 Ajustar tipo de games a lo que espera Room: { id, name }[]
+            const gamesWithMeta = roomConfig.games.map((gameId) => {
+                const def = GAMES.find((g) => g.id === gameId);
+                return {
+                    id: gameId,
+                    name: def?.name ?? gameId,
+                };
+            });
+
+            const roomWithGames: Room = {
                 ...newRoom,
-                games: roomConfig.games
+                games: gamesWithMeta,
             };
 
             onRoomCreated(roomWithGames);
         } catch (error) {
             console.error("Error creating room:", error);
-            // TODO: Show error toast
+            Alert.alert(
+                "Error al crear la sala",
+                "Ocurrió un problema al crear la sala. Inténtalo nuevamente.",
+            );
         } finally {
             setIsCreating(false);
         }
@@ -157,9 +220,11 @@ export default function RoomCreationFlow({
         roomConfig.games.length > 0 &&
         roomConfig.difficulty;
 
-    // Filter test suites that have at least one game in common with selected games
+    // 🔗 Filtrar suites compatibles:
+    // ahora SOLO se muestran los que tengan EXACTAMENTE los mismos juegos
+    // que el profesor seleccionó en el Paso 2.
     const compatibleTestSuites = testSuites.filter((suite) =>
-        suite.games.some((game) => roomConfig.games.includes(game))
+        haveSameGameSet(suite.games, roomConfig.games),
     );
 
     // Step 1: Course Selection
@@ -193,19 +258,24 @@ export default function RoomCreationFlow({
                         courses.map((course) => (
                             <Pressable
                                 key={course.id}
-                                className={`p-4 rounded-xl border-2 active:scale-[0.98] ${selectedCourseId === course.id
-                                    ? "bg-primary/10 border-primary"
-                                    : "border-border bg-surface"
-                                    }`}
-                                onPress={() => setSelectedCourseId(course.id)}
+                                className={`p-4 rounded-xl border-2 active:scale-[0.98] ${
+                                    selectedCourseId === course.id
+                                        ? "bg-primary/10 border-primary"
+                                        : "border-border bg-surface"
+                                }`}
+                                onPress={() => {
+                                    setSelectedCourseId(course.id);
+                                    setShowStep1Errors(false);
+                                }}
                             >
                                 <View className="flex-row items-start justify-between">
                                     <View className="flex-1">
                                         <Text
-                                            className={`text-lg font-bold ${selectedCourseId === course.id
-                                                ? "text-primary"
-                                                : "text-text"
-                                                }`}
+                                            className={`text-lg font-bold ${
+                                                selectedCourseId === course.id
+                                                    ? "text-primary"
+                                                    : "text-text"
+                                            }`}
                                         >
                                             {course.name}
                                         </Text>
@@ -236,15 +306,18 @@ export default function RoomCreationFlow({
                             </Pressable>
                         ))
                     )}
+
+                    {showStep1Errors && !selectedCourseId && (
+                        <Text className="mt-2 text-xs text-red-500">
+                            Debes seleccionar un curso antes de continuar.
+                        </Text>
+                    )}
                 </ScrollView>
 
                 {/* Actions */}
                 <View className="flex-row gap-3 mt-4">
                     <View className="flex-1">
-                        <NunitoButton
-                            onPress={handleContinueToRoomConfig}
-                            disabled={!selectedCourseId}
-                        >
+                        <NunitoButton onPress={handleContinueToRoomConfig}>
                             <View className="flex-row items-center gap-2">
                                 <Text className="text-base font-bold text-primaryOn">
                                     Continuar
@@ -268,6 +341,10 @@ export default function RoomCreationFlow({
 
     // Step 2: Room Configuration
     if (step === 2) {
+        const nameInvalid = showStep2Errors && !roomConfig.name.trim();
+        const gamesInvalid = showStep2Errors && roomConfig.games.length === 0;
+        const difficultyInvalid = showStep2Errors && !roomConfig.difficulty;
+
         return (
             <TeacherSectionCard
                 title="Crear Nueva Sala - Paso 2 de 3"
@@ -285,12 +362,14 @@ export default function RoomCreationFlow({
 
                 <ScrollView className="gap-4" showsVerticalScrollIndicator={false}>
                     {/* Room Name */}
-                    <View className="gap-2">
+                    <View className="gap-1.5">
                         <Text className="text-sm font-semibold text-text">
                             Nombre de la sala
                         </Text>
                         <TextInput
-                            className="rounded-xl border border-border bg-background px-4 py-3 text-base text-text"
+                            className={`rounded-xl border bg-background px-4 py-3 text-base text-text ${
+                                nameInvalid ? "border-red-500" : "border-border"
+                            }`}
                             value={roomConfig.name}
                             onChangeText={(text) =>
                                 setRoomConfig({ ...roomConfig, name: text })
@@ -298,106 +377,135 @@ export default function RoomCreationFlow({
                             placeholder="Ej: Clase 3°A - Fonología"
                             placeholderTextColor={palette.muted}
                         />
+                        {nameInvalid && (
+                            <Text className="text-xs text-red-500">
+                                Ingresa un nombre para la sala.
+                            </Text>
+                        )}
                     </View>
 
                     {/* Game Selection */}
-                    <View className="gap-2">
+                    <View className="gap-1.5">
                         <Text className="text-sm font-semibold text-text">
                             Seleccionar juegos (al menos 1)
                         </Text>
                         <View className="gap-2">
-                            {GAMES.map((game) => (
-                                <Pressable
-                                    key={game.id}
-                                    className={`flex-row items-center gap-3 p-3 rounded-xl border ${roomConfig.games.includes(game.id)
-                                        ? "bg-primary/10 border-primary"
-                                        : "border-border bg-surface"
+                            {GAMES.map((game) => {
+                                const selected = roomConfig.games.includes(game.id);
+                                return (
+                                    <Pressable
+                                        key={game.id}
+                                        className={`flex-row items-center gap-3 p-3 rounded-xl border ${
+                                            selected
+                                                ? "bg-primary/10 border-primary"
+                                                : "border-border bg-surface"
                                         }`}
-                                    onPress={() => toggleGameSelection(game.id)}
-                                >
-                                    <View
-                                        className="h-5 w-5 rounded border-2 items-center justify-center"
-                                        style={{
-                                            borderColor: roomConfig.games.includes(game.id)
-                                                ? palette.primary
-                                                : palette.border,
-                                            backgroundColor: roomConfig.games.includes(game.id)
-                                                ? palette.primary
-                                                : "transparent",
+                                        onPress={() => {
+                                            toggleGameSelection(game.id);
                                         }}
                                     >
-                                        {roomConfig.games.includes(game.id) && (
-                                            <Feather name="check" size={14} color={palette.primaryOn} />
-                                        )}
-                                    </View>
-                                    <Text
-                                        className={`flex-1 text-base font-semibold ${roomConfig.games.includes(game.id)
-                                            ? "text-primary"
-                                            : "text-text"
+                                        <View
+                                            className="h-5 w-5 rounded border-2 items-center justify-center"
+                                            style={{
+                                                borderColor: selected ? palette.primary : palette.border,
+                                                backgroundColor: selected
+                                                    ? palette.primary
+                                                    : "transparent",
+                                            }}
+                                        >
+                                            {selected && (
+                                                <Feather name="check" size={14} color={palette.primaryOn} />
+                                            )}
+                                        </View>
+                                        <Text
+                                            className={`flex-1 text-base font-semibold ${
+                                                selected ? "text-primary" : "text-text"
                                             }`}
-                                    >
-                                        {game.name}
-                                    </Text>
-                                </Pressable>
-                            ))}
+                                        >
+                                            {game.name}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
+                        {gamesInvalid && (
+                            <Text className="text-xs text-red-500">
+                                Selecciona al menos un juego.
+                            </Text>
+                        )}
                     </View>
 
                     {/* Difficulty & Duration */}
                     <View className="flex-row gap-3">
                         {/* Difficulty */}
-                        <View className="flex-1 gap-2">
-                            <Text className="text-sm font-semibold text-text">Dificultad</Text>
+                        <View className="flex-1 gap-1.5">
+                            <Text className="text-sm font-semibold text-text">
+                                Dificultad
+                            </Text>
                             <View className="gap-2">
-                                {DIFFICULTIES.map((diff) => (
-                                    <Pressable
-                                        key={diff.value}
-                                        className={`p-2.5 rounded-xl border ${roomConfig.difficulty === diff.value
-                                            ? "bg-primary/10 border-primary"
-                                            : "border-border bg-surface"
+                                {DIFFICULTIES.map((diff) => {
+                                    const selected = roomConfig.difficulty === diff.value;
+                                    return (
+                                        <Pressable
+                                            key={diff.value}
+                                            className={`p-2.5 rounded-xl border ${
+                                                selected
+                                                    ? "bg-primary/10 border-primary"
+                                                    : "border-border bg-surface"
                                             }`}
-                                        onPress={() =>
-                                            setRoomConfig({ ...roomConfig, difficulty: diff.value })
-                                        }
-                                    >
-                                        <Text
-                                            className={`text-sm font-medium text-center ${roomConfig.difficulty === diff.value
-                                                ? "text-primary"
-                                                : "text-text"
-                                                }`}
+                                            onPress={() =>
+                                                setRoomConfig({
+                                                    ...roomConfig,
+                                                    difficulty: diff.value,
+                                                })
+                                            }
                                         >
-                                            {diff.label}
-                                        </Text>
-                                    </Pressable>
-                                ))}
+                                            <Text
+                                                className={`text-sm font-medium text-center ${
+                                                    selected ? "text-primary" : "text-text"
+                                                }`}
+                                            >
+                                                {diff.label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
                             </View>
+                            {difficultyInvalid && (
+                                <Text className="text-xs text-red-500">
+                                    Selecciona una dificultad.
+                                </Text>
+                            )}
                         </View>
 
                         {/* Duration */}
-                        <View className="flex-1 gap-2">
+                        <View className="flex-1 gap-1.5">
                             <Text className="text-sm font-semibold text-text">Duración</Text>
                             <View className="gap-2">
-                                {DURATIONS.map((dur) => (
-                                    <Pressable
-                                        key={dur.value}
-                                        className={`p-2.5 rounded-xl border ${roomConfig.duration === dur.value
-                                            ? "bg-primary/10 border-primary"
-                                            : "border-border bg-surface"
+                                {DURATIONS.map((dur) => {
+                                    const selected = roomConfig.duration === dur.value;
+                                    return (
+                                        <Pressable
+                                            key={dur.value}
+                                            className={`p-2.5 rounded-xl border ${
+                                                selected
+                                                    ? "bg-primary/10 border-primary"
+                                                    : "border-border bg-surface"
                                             }`}
-                                        onPress={() =>
-                                            setRoomConfig({ ...roomConfig, duration: dur.value })
-                                        }
-                                    >
-                                        <Text
-                                            className={`text-sm font-medium text-center ${roomConfig.duration === dur.value
-                                                ? "text-primary"
-                                                : "text-text"
-                                                }`}
+                                            onPress={() =>
+                                                setRoomConfig({ ...roomConfig, duration: dur.value })
+                                            }
                                         >
-                                            {dur.label}
-                                        </Text>
-                                    </Pressable>
-                                ))}
+                                            <Text
+                                                className={`text-sm font-medium text-center ${
+                                                    selected ? "text-primary" : "text-text"
+                                                }`}
+                                            >
+                                                {dur.label}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
                             </View>
                         </View>
                     </View>
@@ -418,9 +526,10 @@ export default function RoomCreationFlow({
                                             className="px-3 py-1.5 rounded-lg"
                                             style={{
                                                 backgroundColor: withAlpha(
-                                                    (palette[gameData.color as keyof typeof palette] as string) ||
-                                                    palette.primary,
-                                                    0.2
+                                                    (palette[
+                                                        gameData.color as keyof typeof palette
+                                                        ] as string) || palette.primary,
+                                                    0.2,
                                                 ),
                                             }}
                                         >
@@ -438,10 +547,7 @@ export default function RoomCreationFlow({
                 {/* Actions */}
                 <View className="flex-row gap-3 mt-4">
                     <View className="flex-1">
-                        <NunitoButton
-                            onPress={handleContinueToTestSuiteSelection}
-                            disabled={!isStep2Valid}
-                        >
+                        <NunitoButton onPress={handleContinueToTestSuiteSelection}>
                             <View className="flex-row items-center gap-2">
                                 <Text className="text-base font-bold text-primaryOn">
                                     Continuar
@@ -487,16 +593,20 @@ export default function RoomCreationFlow({
                 {testSuitesLoading ? (
                     <View className="items-center py-12">
                         <ActivityIndicator size="large" color={palette.primary} />
-                        <Text className="text-muted mt-4">Cargando conjuntos de preguntas...</Text>
+                        <Text className="text-muted mt-4">
+                            Cargando conjuntos de preguntas...
+                        </Text>
                     </View>
                 ) : compatibleTestSuites.length === 0 ? (
                     <View className="p-6 bg-surfaceMuted/50 rounded-xl border border-border items-center">
                         <Feather name="alert-circle" size={48} color={palette.muted} />
                         <Text className="text-base text-text text-center mt-3">
-                            No hay conjuntos de preguntas compatibles con los juegos seleccionados.
+                            No hay conjuntos de preguntas compatibles con la combinación de
+                            juegos seleccionada.
                         </Text>
                         <Text className="text-sm text-muted text-center mt-2">
-                            Crea un conjunto de preguntas en "Gestionar Preguntas" o vuelve atrás para cambiar los juegos.
+                            Crea un conjunto de preguntas en "Gestionar Preguntas" o vuelve
+                            atrás para cambiar los juegos.
                         </Text>
                         {onNavigateToQuestions && (
                             <View className="mt-4 w-full">
@@ -506,7 +616,11 @@ export default function RoomCreationFlow({
                                     }}
                                 >
                                     <View className="flex-row items-center gap-2">
-                                        <Feather name="layers" size={18} color={palette.primaryOn} />
+                                        <Feather
+                                            name="layers"
+                                            size={18}
+                                            color={palette.primaryOn}
+                                        />
                                         <Text className="text-base font-bold text-primaryOn">
                                             Ir a Gestionar Preguntas
                                         </Text>
@@ -519,19 +633,21 @@ export default function RoomCreationFlow({
                     compatibleTestSuites.map((suite) => (
                         <Pressable
                             key={suite.id}
-                            className={`p-4 rounded-xl border-2 active:scale-[0.98] ${selectedTestSuite === suite.id
-                                ? "bg-primary/10 border-primary"
-                                : "border-border bg-surface"
-                                }`}
+                            className={`p-4 rounded-xl border-2 active:scale-[0.98] ${
+                                selectedTestSuite === suite.id
+                                    ? "bg-primary/10 border-primary"
+                                    : "border-border bg-surface"
+                            }`}
                             onPress={() => setSelectedTestSuite(suite.id)}
                         >
                             <View className="flex-row items-start justify-between mb-2">
                                 <View className="flex-1">
                                     <Text
-                                        className={`text-lg font-bold ${selectedTestSuite === suite.id
-                                            ? "text-primary"
-                                            : "text-text"
-                                            }`}
+                                        className={`text-lg font-bold ${
+                                            selectedTestSuite === suite.id
+                                                ? "text-primary"
+                                                : "text-text"
+                                        }`}
                                     >
                                         {suite.name}
                                     </Text>
@@ -562,7 +678,8 @@ export default function RoomCreationFlow({
 
                             <View className="flex-row items-center gap-2 mt-2">
                                 <Text className="text-xs text-muted">
-                                    {suite.games.length} juego{suite.games.length !== 1 ? "s" : ""}
+                                    {suite.games.length} juego
+                                    {suite.games.length !== 1 ? "s" : ""}
                                 </Text>
                             </View>
 
@@ -574,12 +691,16 @@ export default function RoomCreationFlow({
                                     return (
                                         <View
                                             key={gameId}
-                                            className={`px-2 py-1 rounded ${isSelected ? "bg-primary/20" : "bg-surfaceMuted/50"
-                                                }`}
+                                            className={`px-2 py-1 rounded ${
+                                                isSelected
+                                                    ? "bg-primary/20"
+                                                    : "bg-surfaceMuted/50"
+                                            }`}
                                         >
                                             <Text
-                                                className={`text-xs font-medium ${isSelected ? "text-primary" : "text-muted"
-                                                    }`}
+                                                className={`text-xs font-medium ${
+                                                    isSelected ? "text-primary" : "text-muted"
+                                                }`}
                                             >
                                                 {game.name}
                                             </Text>
@@ -595,10 +716,7 @@ export default function RoomCreationFlow({
             {/* Actions */}
             <View className="flex-row gap-3 mt-4">
                 <View className="flex-1">
-                    <NunitoButton
-                        onPress={handleCreateRoom}
-                        disabled={!selectedTestSuite || isCreating}
-                    >
+                    <NunitoButton onPress={handleCreateRoom} disabled={isCreating}>
                         <View className="flex-row items-center gap-2">
                             <Feather name="play" size={18} color={palette.primaryOn} />
                             <Text className="text-base font-bold text-primaryOn">
