@@ -21,6 +21,7 @@
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@stomp/stompjs": "^7.2.1",
     "axios": "^1.13.2",
+    "eas-cli": "^16.28.0",
     "expo": "~54.0.20",
     "expo-av": "~16.0.7",
     "expo-clipboard": "~8.0.7",

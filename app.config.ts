@@ -7,7 +7,13 @@ export default (): ExpoConfig => ({
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
-  // If this is an EAS/Expo config plugin specific flag, keep it here.
+
+  extra: {
+    eas: {
+      projectId: 'a97814f3-0af6-4472-9df5-beb6f8b4aac3',
+    },
+  },
+
   newArchEnabled: true,
   splash: {
     image: './assets/splash-icon.png',

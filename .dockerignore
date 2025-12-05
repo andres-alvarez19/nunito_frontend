@@ -1,0 +1,14 @@
+# Dependencias locales
+node_modules
+
+# Salida de builds
+dist
+web-build
+
+# Configuración local y VCS
+.git
+.env*
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
