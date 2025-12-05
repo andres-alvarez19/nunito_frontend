@@ -14,55 +14,39 @@ export default function ConnectedUsersList({
 }: ConnectedUsersListProps) {
     return (
         <View className="gap-4">
-            <View className="flex-row gap-4">
-                {/* Users List */}
-                <View className="flex-1 bg-surface rounded-2xl border border-border p-4 gap-3">
-                    <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-bold text-text">Estudiantes</Text>
-                        <View className="bg-primary/10 px-2 py-0.5 rounded-full">
-                            <Text className="text-xs font-bold text-primary">
-                                {connectedUsers.length + connectingUsers.length}
-                            </Text>
-                        </View>
-                    </View>
-
-                    <ScrollView className="max-h-[200px]" showsVerticalScrollIndicator={false}>
-                        {connectedUsers.length === 0 && connectingUsers.length === 0 ? (
-                            <Text className="text-sm text-muted italic text-center py-4">
-                                Esperando estudiantes...
-                            </Text>
-                        ) : (
-                            <View className="gap-2">
-                                {connectedUsers.map((user, index) => (
-                                    <View key={`connected-${index}`} className="flex-row items-center gap-2">
-                                        <View className="w-2 h-2 rounded-full bg-green-500" />
-                                        <Text className="text-sm font-medium text-text">{user}</Text>
-                                    </View>
-                                ))}
-                                {connectingUsers.map((user, index) => (
-                                    <View key={`connecting-${index}`} className="flex-row items-center gap-2 opacity-60">
-                                        <View className="w-2 h-2 rounded-full bg-yellow-500" />
-                                        <Text className="text-sm font-medium text-text">{user} (Conectando...)</Text>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                    </ScrollView>
-                </View>
-
-                {/* Mirror View (Mock) */}
-                <View className="flex-1 bg-surface rounded-2xl border border-border p-4 gap-3">
-                    <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-bold text-text">Vista espejo</Text>
-                        <Feather name="monitor" size={16} color={palette.muted} />
-                    </View>
-                    <View className="flex-1 bg-background rounded-xl border border-border/50 items-center justify-center min-h-[150px]">
-                        <Text className="text-xs text-muted text-center">
-                            Vista previa de la pantalla del estudiante
+            {/* Users List */}
+            <View className="bg-surface rounded-2xl border border-border p-4 gap-3">
+                <View className="flex-row items-center justify-between">
+                    <Text className="text-base font-bold text-text">Estudiantes</Text>
+                    <View className="bg-primary/10 px-2 py-0.5 rounded-full">
+                        <Text className="text-xs font-bold text-primary">
+                            {connectedUsers.length + connectingUsers.length}
                         </Text>
-                        <View className="mt-2 w-16 h-10 bg-primary/20 rounded border border-primary/40" />
                     </View>
                 </View>
+
+                <ScrollView className="max-h-[300px]" showsVerticalScrollIndicator={false}>
+                    {connectedUsers.length === 0 && connectingUsers.length === 0 ? (
+                        <Text className="text-sm text-muted italic text-center py-4">
+                            Esperando estudiantes...
+                        </Text>
+                    ) : (
+                        <View className="flex-row flex-wrap gap-2">
+                            {connectedUsers.map((user, index) => (
+                                <View key={`connected-${index}`} className="flex-row items-center gap-2 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
+                                    <View className="w-2 h-2 rounded-full bg-green-500" />
+                                    <Text className="text-sm font-medium text-text">{user}</Text>
+                                </View>
+                            ))}
+                            {connectingUsers.map((user, index) => (
+                                <View key={`connecting-${index}`} className="flex-row items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-100 opacity-60">
+                                    <View className="w-2 h-2 rounded-full bg-yellow-500" />
+                                    <Text className="text-sm font-medium text-text">{user} (Conectando...)</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+                </ScrollView>
             </View>
         </View>
     );

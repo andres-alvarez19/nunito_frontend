@@ -23,6 +23,8 @@ interface TeacherReportsProps {
 // Let's remove local interfaces that collide.
 
 import { useReports, RoomReport } from "@/services/useReports";
+import { fetchRoomAnswers, fetchRoomResults } from "@/services/useAnswers";
+import type { AnswerRecord } from "@/types/answers";
 import { useAuth } from "@/contexts/AuthContext";
 import { ActivityIndicator } from "react-native";
 
@@ -39,10 +41,13 @@ export default function TeacherReports({
   onBack,
 }: TeacherReportsProps) {
   const { user } = useAuth();
-  const { getTeacherReports } = useReports();
+  const { getTeacherReports, getRoomReportDetails } = useReports();
   const [reports, setReports] = useState<RoomReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState<RoomReport | null>(null);
+  const [answersByStudent, setAnswersByStudent] = useState<Record<string, AnswerRecord[]>>({});
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -92,6 +97,51 @@ export default function TeacherReports({
   const resolveGameName = (gameId: string) =>
     gameDefinitions.find((game) => game.id === gameId)?.name ?? "Actividad";
 
+  const formatElapsed = (elapsedMs?: number) => {
+    if (!elapsedMs && elapsedMs !== 0) return "-";
+    const seconds = Math.round(elapsedMs / 1000);
+    return `${seconds}s`;
+  };
+
+  const handleSelectReport = async (report: RoomReport) => {
+    setLoadingDetail(true);
+    try {
+      setExpandedStudentId(null);
+      const detailed = await getRoomReportDetails(report.roomId);
+      const answersPromise = fetchRoomAnswers(report.roomId);
+      const resultsPromise = fetchRoomResults(report.roomId);
+
+      const [answers, studentsResults] = await Promise.all([answersPromise, resultsPromise]);
+
+      const baseReport = detailed ?? report;
+      const studentsData =
+        (detailed?.students && detailed.students.length > 0
+          ? detailed.students
+          : undefined) ??
+        (report.students && report.students.length > 0 ? report.students : undefined) ??
+        studentsResults;
+
+      const effectiveReport: RoomReport = {
+        ...baseReport,
+        students: studentsData ?? [],
+      };
+
+      setSelectedReport(effectiveReport);
+      const grouped: Record<string, AnswerRecord[]> = {};
+      answers.forEach((ans) => {
+        const key = (ans as any).studentId || (ans as any).studentName || 'desconocido';
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(ans);
+      });
+      setAnswersByStudent(grouped);
+    } catch (error) {
+      console.error('Error loading report detail:', error);
+      setSelectedReport(report);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
   if (selectedReport) {
     const gameName = resolveGameName(selectedReport.gameId);
     const difficultyLabel =
@@ -132,25 +182,92 @@ export default function TeacherReports({
           </View>
         </View>
 
+        {loadingDetail && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <ActivityIndicator size="small" color={palette.primary} />
+            <Text style={{ color: palette.muted }}>Cargando detalle y respuestas...</Text>
+          </View>
+        )}
+
         <View style={styles.studentList}>
           <Text style={styles.sectionTitle}>Resultados por estudiante</Text>
-          {selectedReport.students.map((student) => (
-            <View key={student.name} style={styles.studentRow}>
-              <View style={styles.studentInfo}>
-                <Text style={styles.studentName}>{student.name}</Text>
-                <Text style={styles.studentMeta}>
-                  Completado el {formatDate(student.completedAt)}
-                </Text>
+          {selectedReport.students.map((student) => {
+            const studentKey = (student as any).studentId || (student as any).id || student.name;
+            const studentAnswers = answersByStudent[studentKey] || [];
+            const correctCount = studentAnswers.filter(a => (a as any).isCorrect ?? (a as any).correct).length;
+            return (
+              <View key={studentKey} style={styles.studentBlock}>
+                <View style={styles.studentRow}>
+                  <View style={styles.studentInfo}>
+                    <Text style={styles.studentName}>{student.name}</Text>
+                    <Text style={styles.studentMeta}>
+                      Completado el {formatDate(student.completedAt)}
+                    </Text>
+                    <Text style={styles.studentMeta}>
+                      Respuestas registradas: {studentAnswers.length} • Correctas: {correctCount}
+                    </Text>
+                  </View>
+                  <View style={styles.studentStats}>
+                    <Text style={styles.studentScore}>{student.score}%</Text>
+                    <Text style={styles.studentDetail}>
+                      {student.correctAnswers}/{student.totalQuestions}
+                    </Text>
+                    <Text style={styles.studentDetail}>{student.averageTime}s</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.toggleAnswers}
+                    onPress={() =>
+                      setExpandedStudentId(
+                        expandedStudentId === studentKey ? null : studentKey,
+                      )
+                    }
+                  >
+                    <Text style={styles.toggleAnswersText}>
+                      {expandedStudentId === studentKey ? "Ocultar respuestas" : "Ver respuestas"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {expandedStudentId === studentKey && (
+                  <View style={styles.answersBlock}>
+                    {studentAnswers.length === 0 ? (
+                      <Text style={styles.studentMeta}>
+                        No hay respuestas registradas para este estudiante.
+                      </Text>
+                    ) : (
+                      studentAnswers.map((ans) => (
+                        <View key={ans.id} style={styles.answerRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.answerQuestion}>
+                              Pregunta {ans.questionId}
+                            </Text>
+                            <Text style={styles.answerText}>Respuesta: {ans.answer}</Text>
+                          </View>
+                          <View style={styles.answerStats}>
+                            <Text
+                              style={[
+                                styles.answerBadge,
+                                {
+                                  backgroundColor: (ans.isCorrect ?? false)
+                                    ? withAlpha(palette.primary, 0.12)
+                                    : withAlpha(palette.error, 0.12),
+                                  color: (ans.isCorrect ?? false)
+                                    ? palette.primary
+                                    : palette.error,
+                                },
+                              ]}
+                            >
+                              {(ans.isCorrect ?? false) ? "Correcta" : "Incorrecta"}
+                            </Text>
+                            <Text style={styles.answerTime}>{formatElapsed(ans.elapsedMs)}</Text>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                )}
               </View>
-              <View style={styles.studentStats}>
-                <Text style={styles.studentScore}>{student.score}%</Text>
-                <Text style={styles.studentDetail}>
-                  {student.correctAnswers}/{student.totalQuestions}
-                </Text>
-                <Text style={styles.studentDetail}>{student.averageTime}s</Text>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <View style={styles.actionsRow}>
@@ -159,7 +276,12 @@ export default function TeacherReports({
             contentStyle={styles.secondaryButton}
           >
             <TouchableOpacity
-              onPress={() => setSelectedReport(null)}
+              onPress={() => {
+                setSelectedReport(null);
+                setAnswersByStudent({});
+                setExpandedStudentId(null);
+                setLoadingDetail(false);
+              }}
               style={styles.secondaryButtonInner}
             >
               <Text style={styles.secondaryButtonText}>Volver a reportes</Text>
@@ -209,7 +331,7 @@ export default function TeacherReports({
             <TouchableOpacity
               key={report.roomId}
               style={styles.reportCard}
-              onPress={() => setSelectedReport(report)}
+              onPress={() => handleSelectReport(report)}
             >
               <View style={styles.reportHeader}>
                 <Text style={styles.reportTitle}>{report.roomName}</Text>
@@ -382,8 +504,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 10,
+  },
+  studentBlock: {
     borderBottomWidth: 1,
     borderBottomColor: withAlpha(palette.border, 0.6),
+    paddingVertical: 4,
   },
   studentInfo: {
     flex: 1,
@@ -458,5 +583,57 @@ const styles = StyleSheet.create({
   emptyStateText: {
     color: palette.muted,
     fontSize: 16,
+  },
+  toggleAnswers: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: palette.border,
+    backgroundColor: palette.surfaceMuted,
+  },
+  toggleAnswersText: {
+    color: palette.text,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  answersBlock: {
+    marginTop: 8,
+    backgroundColor: withAlpha(palette.surfaceMuted, 0.6),
+    borderRadius: 12,
+    padding: 10,
+    gap: 8,
+  },
+  answerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: withAlpha(palette.border, 0.5),
+  },
+  answerQuestion: {
+    fontWeight: "600",
+    color: palette.text,
+  },
+  answerText: {
+    color: palette.muted,
+    fontSize: 12,
+  },
+  answerStats: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  answerBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontWeight: "700",
+    fontSize: 11,
+    overflow: "hidden",
+  },
+  answerTime: {
+    color: palette.muted,
+    fontSize: 12,
   },
 });

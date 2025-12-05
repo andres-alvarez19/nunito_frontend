@@ -57,7 +57,6 @@ export default function StudentWaitingRoom({ roomCode, connectedStudents, studen
             <View
                 className="w-full max-w-md rounded-xl border p-4 shadow-sm"
                 style={{
-                    backgroundColor: palette.surface,
                     borderColor: palette.border,
                     shadowColor: '#000',
                     shadowOpacity: 0.05,
@@ -77,7 +76,7 @@ export default function StudentWaitingRoom({ roomCode, connectedStudents, studen
                         <View
                             key={index}
                             className="flex-row items-center gap-2 px-3 py-2 rounded-lg w-[48%]"
-                            style={{ backgroundColor: withAlpha(palette.muted, 0.1) }}
+                            style={{ backgroundColor: palette.accent }}
                         >
                             <View className="w-2 h-2 rounded-full bg-green-500" />
                             <Text

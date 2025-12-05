@@ -106,6 +106,72 @@ export default function TestSuiteManager({
         );
     }
 
+    let testSuitesContent: JSX.Element;
+
+    if (loading && !isCreating) {
+        testSuitesContent = <ActivityIndicator size="large" color={palette.primary} />;
+    } else if (testSuites.length === 0) {
+        testSuitesContent = (
+            <View className="items-center py-12 gap-4">
+                <Feather name="layers" size={64} color={palette.muted} />
+                <Text className="text-center text-muted">
+                    No hay conjuntos disponibles. Crea uno nuevo.
+                </Text>
+            </View>
+        );
+    } else {
+        testSuitesContent = (
+            <ScrollView className="gap-3" showsVerticalScrollIndicator={false}>
+                {testSuites.map((test) => (
+                    <View
+                        key={test.id}
+                        className="flex-row items-center justify-between p-4 border border-border rounded-xl bg-surface"
+                    >
+                        <View className="flex-1 gap-2">
+                            <Text className="text-base font-semibold text-text">
+                                {test.name}
+                            </Text>
+                            <Text className="text-sm text-muted">{test.description}</Text>
+                            <View className="flex-row flex-wrap gap-2 mt-1">
+                                {(test.games || []).map((gameId) => {
+                                    const gameName =
+                                        ALL_GAMES.find((g) => g.id === gameId)?.name || gameId;
+                                    return (
+                                        <View
+                                            key={gameId}
+                                            className="px-2 py-1 rounded-lg"
+                                            style={{
+                                                backgroundColor: palette.mintContainer,
+                                            }}
+                                        >
+                                            <Text className="text-xs text-text font-medium">
+                                                {gameName}
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
+                            </View>
+                        </View>
+                        <View className="flex-row gap-2">
+                            <Pressable
+                                className="p-2 rounded-lg border border-primary bg-primary/10 active:bg-primary/20"
+                                onPress={() => onSelectTestSuite?.(test)}
+                            >
+                                <Feather name="edit-2" size={16} color={palette.primary} />
+                            </Pressable>
+                            <Pressable
+                                className="p-2 rounded-lg bg-error/10 border border-error/30 active:bg-error/20"
+                                onPress={() => handleDeleteTest(test.id)}
+                            >
+                                <Feather name="trash-2" size={16} color={palette.error} />
+                            </Pressable>
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
+        );
+    }
+
     return (
         <View className="gap-4">
             {/* Header */}
@@ -233,65 +299,7 @@ export default function TestSuiteManager({
 
             {/* Test Suites List */}
             <View className="gap-3">
-                {loading && !isCreating ? (
-                    <ActivityIndicator size="large" color={palette.primary} />
-                ) : testSuites.length === 0 ? (
-                    <View className="items-center py-12 gap-4">
-                        <Feather name="layers" size={64} color={palette.muted} />
-                        <Text className="text-center text-muted">
-                            No hay conjuntos disponibles. Crea uno nuevo.
-                        </Text>
-                    </View>
-                ) : (
-                    <ScrollView className="gap-3" showsVerticalScrollIndicator={false}>
-                        {testSuites.map((test) => (
-                            <View
-                                key={test.id}
-                                className="flex-row items-center justify-between p-4 border border-border rounded-xl bg-surface"
-                            >
-                                <View className="flex-1 gap-2">
-                                    <Text className="text-base font-semibold text-text">
-                                        {test.name}
-                                    </Text>
-                                    <Text className="text-sm text-muted">{test.description}</Text>
-                                    <View className="flex-row flex-wrap gap-2 mt-1">
-                                        {(test.games || []).map((gameId) => {
-                                            const gameName =
-                                                ALL_GAMES.find((g) => g.id === gameId)?.name || gameId;
-                                            return (
-                                                <View
-                                                    key={gameId}
-                                                    className="px-2 py-1 rounded-lg"
-                                                    style={{
-                                                        backgroundColor: withAlpha(palette.primary, 0.2),
-                                                    }}
-                                                >
-                                                    <Text className="text-xs text-primary font-medium">
-                                                        {gameName}
-                                                    </Text>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                </View>
-                                <View className="flex-row gap-2">
-                                    <Pressable
-                                        className="p-2 rounded-lg border border-primary bg-primary/10 active:bg-primary/20"
-                                        onPress={() => onSelectTestSuite?.(test)}
-                                    >
-                                        <Feather name="edit-2" size={16} color={palette.primary} />
-                                    </Pressable>
-                                    <Pressable
-                                        className="p-2 rounded-lg bg-error/10 border border-error/30 active:bg-error/20"
-                                        onPress={() => handleDeleteTest(test.id)}
-                                    >
-                                        <Feather name="trash-2" size={16} color={palette.error} />
-                                    </Pressable>
-                                </View>
-                            </View>
-                        ))}
-                    </ScrollView>
-                )}
+                {testSuitesContent}
             </View>
         </View>
     );

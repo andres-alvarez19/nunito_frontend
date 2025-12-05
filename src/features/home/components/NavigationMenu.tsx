@@ -34,6 +34,7 @@ import { palette, withAlpha } from "@/theme/colors";
 import TeacherDashboard from "@/features/home/components/TeacherDashboard";
 import MyRooms from "@/features/home/components/MyRooms";
 import { RoomSummaryItem, StudentResult, DifficultyOption, Room } from "@/features/home/types";
+import { useReports } from "@/services/useReports";
 
 import ConnectedUsersList from "@/features/home/components/ConnectedUsersList";
 import TeacherWaitingRoom from "@/features/home/components/teacher/TeacherWaitingRoom";
@@ -221,6 +222,7 @@ export default function NavigationMenu({
 
   // Dashboard hook
   const { activeRooms, pendingRooms, pastRooms, fetchRooms } = useDashboard();
+  const { getRoomFullResults } = useReports();
 
   // WebSocket Integration
   // Determine which room to connect to: active session room OR selected room details (if active/pending)
@@ -232,7 +234,7 @@ export default function NavigationMenu({
     return null;
   }, [activeSessionRoomId, selectedRoom]);
 
-  const { users: liveConnectedUsers, roomStatus, status: connectionStatus, startActivity, stompClient } = useRoomSocket({
+  const { users: liveConnectedUsers, answers: liveAnswers, roomStatus, status: connectionStatus, startActivity, stompClient } = useRoomSocket({
     roomId: socketRoomId || "",
     userId: user?.id || "teacher-temp-id",
     userName: user?.name || userName || "Profesor",
@@ -244,6 +246,40 @@ export default function NavigationMenu({
     roomId: socketRoomId || "",
     stompClient
   });
+
+  const liveMonitoring = useMemo(() => {
+    if (!socketRoomId) return null;
+    const totalAnsweredAll = liveAnswers.length;
+    const totalCorrectAll = liveAnswers.filter(a => a.isCorrect ?? a.correct).length;
+    const globalAccuracyPct = totalAnsweredAll > 0 ? Math.round((totalCorrectAll / totalAnsweredAll) * 100) : 0;
+
+    const studentsMap = new Map<string, any>();
+    liveAnswers.forEach(ans => {
+      const entry = studentsMap.get(ans.studentId) || {
+        studentId: ans.studentId,
+        studentName: ans.studentName || ans.studentId,
+        answers: 0,
+        correctAnswers: 0,
+        totalQuestions: 0,
+      };
+      entry.answers += 1;
+      entry.totalQuestions += 1;
+      entry.correctAnswers += (ans.isCorrect ?? ans.correct) ? 1 : 0;
+      studentsMap.set(ans.studentId, entry);
+    });
+
+    const liveStudents = Array.from(studentsMap.values());
+
+    return {
+      students: liveStudents,
+      globalStats: {
+        activeStudentsCount: liveStudents.length,
+        totalAnsweredAll,
+        totalCorrectAll,
+        globalAccuracyPct,
+      },
+    };
+  }, [liveAnswers, socketRoomId]);
 
   // Re-destructure useRoomSocket to get stompClient
   // I'll do this in the next chunk or fix the previous one.
@@ -329,6 +365,29 @@ export default function NavigationMenu({
     setSelectedRoom(room);
   };
 
+  // Load full students results (with answers) when a room is selected
+  useEffect(() => {
+    let cancelled = false;
+    const loadFullResults = async () => {
+      if (!selectedRoom?.id) return;
+      const results = await getRoomFullResults(selectedRoom.id);
+      if (cancelled) return;
+      if (results && results.length > 0) {
+        setSelectedRoom((prev) => {
+          if (!prev || prev.id !== selectedRoom.id) return prev;
+          return {
+            ...prev,
+            studentsResults: results,
+            students: results.length,
+            studentsCount: results.length,
+          };
+        });
+      }
+    };
+    void loadFullResults();
+    return () => { cancelled = true; };
+  }, [selectedRoom?.id, getRoomFullResults]);
+
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString("es-ES", {
       year: "numeric",
@@ -341,10 +400,20 @@ export default function NavigationMenu({
   const formatSeconds = (seconds: number) => `${seconds.toFixed(1)}s`;
 
   const handleStartActivity = (roomId: string) => {
-    const room = activeRooms.find((r) => r.id === roomId) || pendingRooms.find((r) => r.id === roomId);
-    if (room) {
+    // Check active rooms first - if found, go straight to live session
+    const activeRoom = activeRooms.find((r) => r.id === roomId);
+    if (activeRoom) {
+      setActiveSessionRoomId(roomId);
+      setSessionStatus("live");
+      return;
+    }
+
+    // Check pending rooms - if found, go to waiting room
+    const pendingRoom = pendingRooms.find((r) => r.id === roomId);
+    if (pendingRoom) {
       setActiveSessionRoomId(roomId);
       setSessionStatus("waiting");
+      return;
     }
   };
 
@@ -384,6 +453,53 @@ export default function NavigationMenu({
     const gameName =
       gameDefinitions.find((g) => g.id === selectedRoom.gameId)?.name ??
       selectedRoom.gameLabel;
+    const isLiveRoom = socketRoomId === selectedRoom.id && !!liveAnswers;
+    const liveRoomAnswers = isLiveRoom ? liveAnswers : [];
+
+    const liveStats = (() => {
+      const total = liveRoomAnswers.length;
+      const correct = liveRoomAnswers.filter(a => a.isCorrect ?? a.correct).length;
+      const globalAccuracyPct = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+      const byStudent = new Map<string, any>();
+      liveRoomAnswers.forEach(ans => {
+        const entry = byStudent.get(ans.studentId) || {
+          name: ans.studentName || ans.studentId,
+          score: 0,
+          correctAnswers: 0,
+          totalQuestions: 0,
+          averageTime: 0,
+          completedAt: ans.answeredAt || ans.sentAt || new Date().toISOString(),
+          answers: [] as any[],
+        };
+        entry.totalQuestions += 1;
+        entry.correctAnswers += (ans.isCorrect ?? ans.correct) ? 1 : 0;
+        entry.averageTime += ans.elapsedMs ? ans.elapsedMs : 0;
+        entry.answers.push({
+          id: ans.id || `${ans.studentId}-${ans.questionId}-${entry.answers.length}`,
+          roomId: ans.roomId || selectedRoom.id,
+          studentId: ans.studentId,
+          gameId: (ans as any).gameId,
+          questionId: ans.questionId?.toString?.() ?? "",
+          questionText: ans.questionText ?? null,
+          answer: ans.selectedOptionText || ans.selectedOptionId || ans.answer || "",
+          isCorrect: ans.isCorrect ?? ans.correct,
+          elapsedMs: ans.elapsedMs,
+          attempt: ans.attempt,
+          createdAt: ans.createdAt,
+          sentAt: (ans as any).sentAt,
+        });
+        byStudent.set(ans.studentId, entry);
+      });
+
+      const liveStudents = Array.from(byStudent.values()).map((s) => ({
+        ...s,
+        averageTime: s.totalQuestions > 0 ? Math.round(s.averageTime / s.totalQuestions / 1000) : 0,
+        score: s.totalQuestions > 0 ? Math.round((s.correctAnswers / s.totalQuestions) * 100) : 0,
+      }));
+
+      return { liveStudents, globalAccuracyPct };
+    })();
 
     return (
       <TeacherSectionCard
@@ -481,8 +597,15 @@ export default function NavigationMenu({
           </View>
 
           <View className="gap-2.5">
-            <Text className="text-base font-bold text-text">Resultados por estudiante</Text>
-            {(selectedRoom.studentsResults || []).map((student) => (
+            <View className="flex-row items-center justify-between">
+              <Text className="text-base font-bold text-text">Resultados por estudiante</Text>
+              {isLiveRoom && (
+                <Text className="text-sm font-semibold text-primary">
+                  Precisión global: {liveStats.globalAccuracyPct}%
+                </Text>
+              )}
+            </View>
+            {(isLiveRoom ? liveStats.liveStudents : (selectedRoom.studentsResults || [])).map((student) => (
               <View key={student.name} className="border border-border/80 rounded-xl p-3 gap-2.5 bg-surface shadow-sm">
                 <View className="flex-row justify-between items-center">
                   <Text className="text-[15px] font-bold text-text">{student.name}</Text>
@@ -503,12 +626,14 @@ export default function NavigationMenu({
                       {formatSeconds(student.averageTime)}
                     </Text>
                   </View>
-                  <View className="flex-1 min-w-[140px] gap-1">
-                    <Text className="text-xs text-muted">Completado</Text>
-                    <Text className="text-sm font-bold text-text">
-                      {formatDate(student.completedAt)}
-                    </Text>
-                  </View>
+                  {!isLiveRoom && (
+                    <View className="flex-1 min-w-[140px] gap-1">
+                      <Text className="text-xs text-muted">Completado</Text>
+                      <Text className="text-sm font-bold text-text">
+                        {formatDate(student.completedAt)}
+                      </Text>
+                    </View>
+                  )}
                   <View className="flex-1 min-w-[140px] gap-1">
                     <Text className="text-xs text-muted">Progreso</Text>
                     <View className="h-1.5 rounded-full bg-primary/18 overflow-hidden">
@@ -519,6 +644,29 @@ export default function NavigationMenu({
                     </View>
                   </View>
                 </View>
+                {student.answers && student.answers.length > 0 && (
+                  <View className="mt-2 gap-1.5">
+                    <Text className="text-xs text-muted font-semibold">Respuestas</Text>
+                    {student.answers.map((ans) => (
+                      <View key={ans.id || `${ans.questionId}-${ans.sentAt}`} className="p-2 rounded-lg border border-border/60 bg-surfaceMuted">
+                        <Text className="text-xs text-muted">
+                          Pregunta {ans.questionId}{ans.questionText ? `: ${ans.questionText}` : ""}
+                        </Text>
+                        <Text className="text-sm font-semibold text-text">
+                          Respuesta: {ans.answer}
+                        </Text>
+                        <View className="flex-row justify-between mt-1">
+                          <Text className="text-xs text-muted">
+                            Correcta: {ans.isCorrect ? "Sí" : "No"}
+                          </Text>
+                          <Text className="text-xs text-muted">
+                            Tiempo: {ans.elapsedMs ? `${Math.round(ans.elapsedMs / 1000)}s` : "-"}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             ))}
           </View>
@@ -534,7 +682,9 @@ export default function NavigationMenu({
                   className="h-12 rounded-xl bg-primary items-center justify-center shadow-md active:opacity-90"
                   onPress={() => handleStartActivity(selectedRoom.id)}
                 >
-                  <Text className="text-base font-bold text-primaryOn">Iniciar Actividad</Text>
+                  <Text className="text-base font-bold text-primaryOn">
+                    {selectedRoom.status === "active" ? "Ver estado" : "Iniciar Actividad"}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -562,6 +712,7 @@ export default function NavigationMenu({
               setSessionStatus("idle");
               setActiveSessionRoomId(null);
             }}
+            status={room.status}
           />
         );
       }
@@ -579,8 +730,8 @@ export default function NavigationMenu({
             monitoringData={{
               roomId: room.id,
               timestamp: new Date().toISOString(),
-              students: monitoredStudents,
-              globalStats: globalStats || {
+              students: liveMonitoring?.students || monitoredStudents,
+              globalStats: liveMonitoring?.globalStats || globalStats || {
                 activeStudentsCount: 0,
                 totalAnsweredAll: 0,
                 totalCorrectAll: 0,
@@ -1260,5 +1411,3 @@ export default function NavigationMenu({
     </ScrollView>
   );
 }
-
-

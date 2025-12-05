@@ -52,7 +52,9 @@ export default function RoomDashboard({
     roomId: room.id,
     userId: user?.id || "teacher-temp-id",
     userName: user?.name || "Profesor",
-    enabled: true, // Always connect when in dashboard
+    isTeacher: true,
+    enabled: true,
+    prefetchAnswers: true,
   });
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -81,8 +83,7 @@ export default function RoomDashboard({
 
   const { students: monitoredStudents, globalStats, ranking, connectionState } = useRoomMonitoring({
     roomId: room.id,
-    stompClient: null // We need the client from useRoomSocket, but useRoomSocket doesn't return it yet in the component usage above.
-    // Wait, I updated useRoomSocket to return it. I need to destructure it.
+    stompClient,
   });
 
   // Re-call useRoomSocket to get the client properly

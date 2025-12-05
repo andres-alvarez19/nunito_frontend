@@ -26,7 +26,7 @@ export default function NunitoButton({
 }: NunitoButtonProps) {
   return (
     <View
-      className="w-full rounded-xl p-1.5 justify-center items-stretch bg-surfaceMuted"
+      className="w-full rounded-xl p-0.5 justify-center items-stretch bg-surfaceMuted"
       style={style}
     >
       <Pressable

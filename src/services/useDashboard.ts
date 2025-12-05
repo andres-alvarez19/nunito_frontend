@@ -54,33 +54,71 @@ export const useDashboard = () => {
                 return rooms.map(room => {
                     console.log("Procesando sala cruda:", JSON.stringify(room, null, 2));
                     const gameDef = gameDefinitions.find(g => g.id === room.gameId);
-                    // Handle case where students might be an array (from Room entity) or missing
-                    const studentsVal = room.students as any;
+                    const studentsVal = (room as any).students;
                     const studentCount = Array.isArray(studentsVal)
                         ? studentsVal.length
                         : typeof studentsVal === 'number'
                             ? studentsVal
-                            : 0;
+                            : typeof (room as any).studentsCount === 'number'
+                                ? (room as any).studentsCount
+                                : 0;
+
+                    const averageScore = typeof (room as any).averageScore === 'number'
+                        ? (room as any).averageScore
+                        : room.average ?? 0;
+
+                    const completionRate = typeof (room as any).completionRate === 'number'
+                        ? (room as any).completionRate
+                        : room.completion ?? 0;
+
+                    const createdAt = room.createdAt || (room as any).lastActivityAt || (room as any).created_at || new Date().toISOString();
+                    const resolvedGameLabel = (room as any).games && (room as any).games.length > 0
+                        ? (room as any).games[0].name
+                        : gameDef ? gameDef.name : room.gameLabel || "Sin juegos";
 
                     return {
                         ...room,
+                        title: room.title || (room as any).name || (room as any).roomName || "Sala sin nombre",
                         students: studentCount,
-                        average: room.average ?? 0,
-                        completion: room.completion ?? 0,
-                        studentsResults: room.studentsResults || [],
-                        gameLabel: (room as any).games && (room as any).games.length > 0
-                            ? (room as any).games[0].name
-                            : gameDef ? gameDef.name : room.gameLabel || "Sin juegos",
+                        average: Math.round(averageScore),
+                        completion: Math.round(completionRate),
+                        dateTime: room.dateTime || new Date(createdAt).toLocaleString(),
+                        createdAt,
+                        studentsResults: (room.studentsResults || room.students || []).map((student: any) => ({
+                            name: student?.name || student?.studentName || "Estudiante",
+                            score: Math.round(student?.score ?? 0),
+                            correctAnswers: student?.correctAnswers ?? student?.correct ?? 0,
+                            totalQuestions: student?.totalQuestions ?? student?.total ?? (student?.correctAnswers ?? 0) + (student?.incorrectAnswers ?? 0),
+                            averageTime: Math.round(student?.averageTime ?? student?.averageTimeSeconds ?? 0),
+                            completedAt: student?.completedAt ?? student?.finishedAt ?? student?.completed_at ?? new Date().toISOString(),
+                            answers: Array.isArray(student?.answers)
+                                ? student.answers.map((ans: any) => ({
+                                    id: ans?.id,
+                                    roomId: ans?.roomId,
+                                    studentId: ans?.studentId,
+                                    gameId: ans?.gameId,
+                                    questionId: ans?.questionId?.toString?.() ?? "",
+                                    questionText: ans?.questionText ?? null,
+                                    answer: ans?.answer ?? "",
+                                    isCorrect: ans?.isCorrect,
+                                    elapsedMs: ans?.elapsedMs,
+                                    attempt: ans?.attempt,
+                                    createdAt: ans?.createdAt,
+                                    sentAt: ans?.sentAt,
+                                }))
+                                : [],
+                        })),
+                        gameLabel: resolvedGameLabel,
                         gameLabels: (room as any).games
                             ? (room as any).games.map((g: any) => g.name)
-                            : [gameDef ? gameDef.name : room.gameLabel || "Sin juegos"]
+                            : [resolvedGameLabel]
                     };
                 });
             };
 
-            setPendingRooms(mapGameLabel(pendingData));
-            setActiveRooms(mapGameLabel(activeData));
-            setPastRooms(mapGameLabel(finishedData));
+            setPendingRooms(mapGameLabel(pendingData).map(r => ({ ...r, status: 'pending' })));
+            setActiveRooms(mapGameLabel(activeData).map(r => ({ ...r, status: 'active' })));
+            setPastRooms(mapGameLabel(finishedData).map(r => ({ ...r, status: 'finished' })));
         } catch (err) {
             console.error("Error fetching rooms:", err);
             setError("Error al cargar las salas");

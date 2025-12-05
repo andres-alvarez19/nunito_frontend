@@ -51,6 +51,22 @@ export type StudentResult = {
   totalQuestions: number;
   averageTime: number;
   completedAt: string;
+  answers?: StudentAnswer[];
+};
+
+export type StudentAnswer = {
+  id: string;
+  roomId: string;
+  studentId: string;
+  gameId?: string;
+  questionId: string;
+  questionText?: string | null;
+  answer: string;
+  isCorrect?: boolean;
+  elapsedMs?: number;
+  attempt?: number;
+  createdAt?: string;
+  sentAt?: string;
 };
 
 export type RoomSummaryItem = {
@@ -65,7 +81,15 @@ export type RoomSummaryItem = {
   average: number;
   completion: number;
   status: "pending" | "active" | "finished";
-  studentsResults: StudentResult[];
+  studentsResults?: StudentResult[];
   code?: string;
   gameLabels: string[];
+  // API compatibility fields
+  name?: string;
+  roomName?: string;
+  studentsCount?: number;
+  averageScore?: number;
+  completionRate?: number;
+  lastActivityAt?: string;
+  isActive?: boolean;
 };

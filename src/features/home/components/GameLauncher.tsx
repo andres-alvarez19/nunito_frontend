@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Client } from '@stomp/stompjs';
 import { useQuestions } from '@/services/useQuestions';
 import { useEffect } from 'react';
+import { submitGameResult } from '@/services/useAnswers';
 
 interface GameLauncherProps {
   gameId: string;
@@ -40,6 +41,8 @@ export default function GameLauncher({ gameId, difficulty, timeLimit, onGameComp
   const SelectedGame = gameRegistry[gameId];
   const { user } = useAuth();
   const { questions, fetchQuestions, loading } = useQuestions();
+  const safeStudentName = studentName || user?.name || 'Estudiante';
+  const safeStudentId = studentId || user?.id || 'temp-student';
 
   useEffect(() => {
     if (testSuiteId) {
@@ -69,15 +72,41 @@ export default function GameLauncher({ gameId, difficulty, timeLimit, onGameComp
 
   const { publishAnswer } = useGameMonitoringPublisher({
     roomId: roomId || '',
-    studentId: studentId || user?.id || 'temp-student',
-    studentName: studentName || 'Estudiante',
+    studentId: safeStudentId,
+    studentName: safeStudentName,
     gameId,
     stompClient: stompClient || null // Use passed client
   });
 
   useEffect(() => {
     console.log('GameLauncher mounted. StompClient connected:', stompClient?.connected);
-  }, [stompClient]);
+    console.log('GameLauncher params:', { roomId, studentId, studentName, gameId });
+  }, [stompClient, roomId, studentId, studentName, gameId]);
+
+  const handleGameComplete = (results: GameResults) => {
+    console.log('GameLauncher - Game Complete. Results:', results);
+
+    if (roomId) {
+      const payload = {
+        studentId: safeStudentId,
+        studentName: safeStudentName,
+        roomId,
+        gameId,
+        totalQuestions: results.totalQuestions,
+        correctAnswers: results.correctAnswers,
+        incorrectAnswers: results.incorrectAnswers,
+        averageTimeSeconds: results.averageTime,
+        score: results.score,
+        completedAt: new Date().toISOString(),
+      };
+
+      void submitGameResult(roomId, payload).catch((error) => {
+        console.error('Error submitting game result:', error);
+      });
+    }
+
+    onGameComplete(results);
+  };
 
   if (!SelectedGame) {
     return (
@@ -110,7 +139,9 @@ export default function GameLauncher({ gameId, difficulty, timeLimit, onGameComp
       difficulty={difficulty}
       timeLimit={timeLimit}
       onExit={onBack}
-      onGameComplete={onGameComplete}
+      onGameComplete={(results) => {
+        handleGameComplete(results);
+      }}
       onAnswer={publishAnswer}
       questions={questions.length > 0 ? questions : undefined}
     />

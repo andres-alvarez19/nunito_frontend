@@ -15,6 +15,7 @@ export interface RoomSummaryCardProps {
   code?: string;
   onPressDetails?: () => void;
   onStartActivity?: () => void;
+  status?: "pending" | "active" | "finished";
 }
 
 export default function RoomSummaryCard({
@@ -27,6 +28,7 @@ export default function RoomSummaryCard({
   code,
   onPressDetails,
   onStartActivity,
+  status,
 }: RoomSummaryCardProps) {
   const [copied, setCopied] = useState(false);
 
@@ -92,7 +94,9 @@ export default function RoomSummaryCard({
             className="flex-1 h-10 rounded-lg bg-primary items-center justify-center shadow-sm active:opacity-90"
             onPress={onStartActivity}
           >
-            <Text className="text-sm font-bold text-primaryOn">Iniciar actividad</Text>
+            <Text className="text-sm font-bold text-primaryOn">
+              {status === "active" ? "Ver estado" : "Iniciar actividad"}
+            </Text>
           </TouchableOpacity>
         )}
         {onPressDetails && (

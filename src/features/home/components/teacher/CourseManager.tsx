@@ -6,6 +6,7 @@ import {
     TextInput,
     View,
     ActivityIndicator,
+    Modal,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 
@@ -29,14 +30,18 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
         error,
         fetchCourses,
         createCourse,
+        updateCourse,
         deleteCourse
     } = useCourses();
     const { error: showError, success: showSuccess } = useNotification();
 
     const [isCreating, setIsCreating] = useState(false);
     const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+    const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [newCourseName, setNewCourseName] = useState("");
     const [newCourseDesc, setNewCourseDesc] = useState("");
+    const [editCourseName, setEditCourseName] = useState("");
+    const [editCourseDesc, setEditCourseDesc] = useState("");
 
     const { user } = useAuth();
     useEffect(() => {
@@ -65,7 +70,6 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
     };
 
     const handleDeleteCourse = async (id: string) => {
-        // For now, we'll delete directly. In the future, we could add a confirmation modal
         try {
             await deleteCourse(id);
             if (selectedCourse === id) {
@@ -78,9 +82,98 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
         }
     };
 
-    const handleSelectCourse = (id: string) => {
-        setSelectedCourse(id);
-        onSelectCourse?.(id);
+    const openEditModal = (courseId: string) => {
+        const course = courses.find((c) => c.id === courseId);
+        if (!course) return;
+        setSelectedCourse(course.id);
+        setEditCourseName(course.name);
+        setEditCourseDesc(course.description || "");
+        setIsEditModalVisible(true);
+    };
+
+    const closeEditModal = () => {
+        setIsEditModalVisible(false);
+        setSelectedCourse(null);
+        setEditCourseName("");
+        setEditCourseDesc("");
+    };
+
+    const handleUpdateCourse = async () => {
+        if (!selectedCourse || !editCourseName.trim()) return;
+        try {
+            await updateCourse(selectedCourse, {
+                name: editCourseName,
+                description: editCourseDesc,
+            });
+            showSuccess("Curso actualizado exitosamente");
+            setIsEditModalVisible(false);
+        } catch (e) {
+            showError("No se pudo actualizar el curso");
+        }
+    };
+
+    const renderCoursesContent = () => {
+        if (loading && !isCreating) {
+            return <ActivityIndicator size="large" color={palette.primary} />;
+        }
+
+        if (courses.length === 0) {
+            return (
+                <View className="items-center py-12 gap-4">
+                    <Feather name="book-open" size={64} color={palette.muted} />
+                    <Text className="text-muted text-center">
+                        No hay cursos. Crea uno nuevo para comenzar.
+                    </Text>
+                </View>
+            );
+        }
+
+        return (
+            <ScrollView className="gap-3" showsVerticalScrollIndicator={false}>
+                {courses.map((course) => (
+                    <View
+                        key={course.id}
+                        className={`p-4 border rounded-xl ${selectedCourse === course.id
+                            ? "bg-primary/10 border-primary"
+                            : "border-border bg-surface"
+                            }`}
+                    >
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-1 gap-1">
+                                <Text className="text-base font-semibold text-text">
+                                    {course.name}
+                                </Text>
+                                <Text className="text-sm text-muted">
+                                    {course.description || "Sin descripción"}
+                                </Text>
+                                <View className="flex-row gap-4 mt-2">
+                                    <Pressable onPress={() => openEditModal(course.id)}>
+                                        <Text className="text-xs text-primary">
+                                            Ver detalles
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                            <View className="flex-row gap-2">
+                                <Pressable
+                                    className="p-2 rounded-lg border border-primary bg-primary/10 active:bg-primary/20"
+                                    onPress={() => onSelectCourse?.(course.id)}
+                                    disabled={loading}
+                                >
+                                    <Feather name="edit-2" size={16} color={palette.primary} />
+                                </Pressable>
+                                <Pressable
+                                    className="p-2 rounded-lg bg-error/10 border border-error/30 active:bg-error/20"
+                                    onPress={() => handleDeleteCourse(course.id)}
+                                >
+                                    <Feather name="trash-2" size={16} color={palette.error} />
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                ))}
+            </ScrollView>
+        );
     };
 
     return (
@@ -180,58 +273,80 @@ export default function CourseManager({ onSelectCourse }: CourseManagerProps) {
 
                 {/* Courses List */}
                 <View className="gap-3">
-                    {loading && !isCreating ? (
-                        <ActivityIndicator size="large" color={palette.primary} />
-                    ) : courses.length === 0 ? (
-                        <View className="items-center py-12 gap-4">
-                            <Feather name="book-open" size={64} color={palette.muted} />
-                            <Text className="text-muted text-center">
-                                No hay cursos. Crea uno nuevo para comenzar.
-                            </Text>
-                        </View>
-                    ) : (
-                        <ScrollView className="gap-3" showsVerticalScrollIndicator={false}>
-                            {courses.map((course) => (
-                                <View
-                                    key={course.id}
-                                    className={`p-4 border rounded-xl ${selectedCourse === course.id
-                                        ? "bg-primary/10 border-primary"
-                                        : "border-border bg-surface"
-                                        }`}
-                                >
-                                    <View className="flex-row items-center justify-between">
-                                        <View className="flex-1 gap-1">
-                                            <Text className="text-base font-semibold text-text">
-                                                {course.name}
-                                            </Text>
-                                            <Text className="text-sm text-muted">
-                                                {course.description || "Sin descripción"}
-                                            </Text>
-                                            <Text className="text-xs text-primary mt-2">
-                                                Ver detalles
-                                            </Text>
-                                        </View>
-                                        <View className="flex-row gap-2">
-                                            <Pressable
-                                                className="p-2 rounded-lg border border-primary bg-primary/10 active:bg-primary/20"
-                                                onPress={() => handleSelectCourse(course.id)}
-                                                disabled={loading}
-                                            >
-                                                <Feather name="edit-2" size={16} color={palette.primary} />
-                                            </Pressable>
-                                            <Pressable
-                                                className="p-2 rounded-lg bg-error/10 border border-error/30 active:bg-error/20"
-                                                onPress={() => handleDeleteCourse(course.id)}
-                                            >
-                                                <Feather name="trash-2" size={16} color={palette.error} />
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                </View>
-                            ))}
-                        </ScrollView>
-                    )}
+                    {renderCoursesContent()}
                 </View>
+
+                <Modal
+                    visible={isEditModalVisible}
+                    animationType="slide"
+                    transparent
+                    onRequestClose={closeEditModal}
+                >
+                    <View className="flex-1 bg-black/50 justify-center px-4">
+                        <View
+                            className="bg-surface p-4 rounded-2xl gap-4 border border-border w-full"
+                            style={{ maxWidth: 640, alignSelf: "center" }}
+                        >
+                            <View className="flex-row items-center justify-between">
+                                <Text className="text-lg font-bold text-text">
+                                    Editar Curso
+                                </Text>
+                            </View>
+                            <View className="gap-2">
+                                <Text className="text-sm font-semibold text-text">
+                                    Nombre del Curso
+                                </Text>
+                                <TextInput
+                                    className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                                    value={editCourseName}
+                                    onChangeText={setEditCourseName}
+                                    placeholder="Ej: Español 3A"
+                                    placeholderTextColor={palette.muted}
+                                    editable={!loading}
+                                />
+                            </View>
+                            <View className="gap-2">
+                                <Text className="text-sm font-semibold text-text">
+                                    Descripción
+                                </Text>
+                                <TextInput
+                                    className="rounded-xl border border-border bg-surface px-4 py-3 text-base text-text"
+                                    value={editCourseDesc}
+                                    onChangeText={setEditCourseDesc}
+                                    placeholder="Describe el curso"
+                                    placeholderTextColor={palette.muted}
+                                    multiline
+                                    numberOfLines={2}
+                                    editable={!loading}
+                                />
+                            </View>
+                            <View className="flex-row gap-3">
+                                <View className="flex-1">
+                                    <NunitoButton onPress={handleUpdateCourse} disabled={loading}>
+                                        {loading ? (
+                                            <ActivityIndicator color={palette.primaryOn} />
+                                        ) : (
+                                            <Text className="text-base font-bold text-primaryOn">
+                                                Guardar cambios
+                                            </Text>
+                                        )}
+                                    </NunitoButton>
+                                </View>
+                                <View className="flex-1">
+                                    <NunitoButton
+                                        onPress={closeEditModal}
+                                        contentStyle={{ backgroundColor: palette.surface }}
+                                        disabled={loading}
+                                    >
+                                        <Text className="text-base font-semibold text-text">
+                                            Cancelar
+                                        </Text>
+                                    </NunitoButton>
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </View>
         </TeacherSectionCard>
     );

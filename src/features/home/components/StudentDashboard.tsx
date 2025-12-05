@@ -51,6 +51,7 @@ export default function StudentDashboard({
   onLeaveRoom,
   connectedUsers,
   roomStatus,
+  connectionStatus = 'DISCONNECTED',
 }: StudentDashboardProps) {
   const totalTime = 600;
   const [isWaiting, setIsWaiting] = useState(true);
@@ -130,7 +131,7 @@ export default function StudentDashboard({
               ¡Hola, {studentName}!
             </Text>
             <Text className="text-sm" style={{ color: palette.muted }}>
-              Sala {roomCode}
+              Sala {roomCode} · {connectionStatus === 'CONNECTED' ? 'En línea' : connectionStatus === 'CONNECTING' ? 'Conectando…' : 'Sin conexión'}
             </Text>
           </View>
           <TouchableOpacity

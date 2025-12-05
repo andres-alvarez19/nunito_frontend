@@ -54,6 +54,7 @@ export default function MyRooms({
                             code={room.code}
                             onPressDetails={() => onNavigateToRoom(room)}
                             onStartActivity={() => onStartActivity(room.id)}
+                            status={room.status}
                         />
                     ))
                 ) : (
@@ -76,6 +77,7 @@ export default function MyRooms({
                             code={room.code}
                             onPressDetails={() => onNavigateToRoom(room)}
                             onStartActivity={() => onStartActivity(room.id)}
+                            status={room.status}
                         />
                     ))
                 ) : (

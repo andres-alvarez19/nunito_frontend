@@ -44,7 +44,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGameComplete, questions: fetchedQuestions }: GameComponentProps) {
+export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGameComplete, onAnswer, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.pastelContainer,
@@ -135,6 +135,16 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
     setAnswerWasCorrect(wasCorrect);
     setShowFeedback(true);
     setShowSyllables(true);
+
+    if (onAnswer) {
+      onAnswer(
+        currentQuestion.id.toString(),
+        `¿Cuántas sílabas tiene ${currentQuestion.word}?`,
+        selectedAnswer !== null ? String(selectedAnswer) : 'NO_ANSWER',
+        wasCorrect,
+        responseTime * 1000
+      );
+    }
 
     setStats((prev) => {
       const nextStreak = wasCorrect ? prev.streak + 1 : 0;

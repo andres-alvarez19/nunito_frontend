@@ -80,7 +80,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, onGameComplete, questions: fetchedQuestions }: GameComponentProps) {
+export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, onGameComplete, onAnswer, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.blueContainer,
@@ -182,6 +182,16 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
     setAnswerWasCorrect(wasCorrect);
     setShowFeedback(true);
     setIsPlaying(false);
+
+    if (onAnswer) {
+      onAnswer(
+        currentQuestion.id.toString(),
+        `Escucha y selecciona la palabra: ${currentQuestion.audioWord}`,
+        selectedAnswer ?? 'NO_ANSWER',
+        wasCorrect,
+        responseTime * 1000
+      );
+    }
 
     setStats((prev) => {
       const nextStreak = wasCorrect ? prev.streak + 1 : 0;

@@ -64,7 +64,7 @@ interface StatsState {
   maxStreak: number;
 }
 
-export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplete, questions: fetchedQuestions }: GameComponentProps) {
+export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplete, onAnswer, questions: fetchedQuestions }: GameComponentProps) {
   const theme = useMemo(
     () => ({
       container: palette.violetContainer,
@@ -153,6 +153,16 @@ export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplet
     const responseTime = Math.max(1, Math.round((Date.now() - questionStartRef.current) / 1000));
     setAnswerWasCorrect(wasCorrect);
     setShowFeedback(true);
+
+    if (onAnswer) {
+      onAnswer(
+        currentQuestion.id.toString(),
+        `Selecciona las palabras que riman con ${currentQuestion.keyWord}`,
+        selectedAnswers.length > 0 ? selectedAnswers.join(',') : 'NO_ANSWER',
+        wasCorrect,
+        responseTime * 1000
+      );
+    }
 
     setStats((prev) => {
       const nextStreak = wasCorrect ? prev.streak + 1 : 0;

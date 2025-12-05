@@ -15,6 +15,7 @@ interface TeacherWaitingRoomProps {
     onStartActivity: () => void;
     onCancel: () => void;
     connectionStatus?: 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
+    status?: 'pending' | 'active' | 'finished';
 }
 
 export default function TeacherWaitingRoom({
@@ -26,6 +27,7 @@ export default function TeacherWaitingRoom({
     onStartActivity,
     onCancel,
     connectionStatus = 'DISCONNECTED',
+    status,
 }: TeacherWaitingRoomProps) {
     // If selectedGames is empty but gameName is provided, use gameName
     const gamesToList = selectedGames.length > 0 ? selectedGames : [gameName];
@@ -92,12 +94,12 @@ export default function TeacherWaitingRoom({
                     </View>
                 </View>
 
-                {/* Right Column: Games & Mirror View */}
+                {/* Right Column: Games */}
                 <View className="flex-1 gap-6">
                     {/* Selected Games */}
-                    <View className="bg-surface border border-border/60 rounded-2xl p-4">
+                    <View className="bg-surface border border-border/60 rounded-2xl p-4 flex-1">
                         <Text className="text-base font-bold text-text mb-3">Juegos seleccionados</Text>
-                        <ScrollView className="max-h-[150px]" showsVerticalScrollIndicator={true}>
+                        <ScrollView className="flex-1" showsVerticalScrollIndicator={true}>
                             <View className="gap-2">
                                 {gamesToList.map((game, index) => (
                                     <View key={index} className="flex-row items-center gap-3 p-2.5 rounded-xl bg-primary/5 border border-primary/10">
@@ -112,38 +114,6 @@ export default function TeacherWaitingRoom({
                             </View>
                         </ScrollView>
                     </View>
-
-                    {/* Mirror View Placeholder */}
-                    <View className="flex-1 bg-surface border border-border/60 rounded-2xl overflow-hidden flex flex-col">
-                        <View className="p-3 border-b border-border/60 bg-surfaceMuted/30 flex-row items-center justify-between">
-                            <Text className="text-sm font-bold text-text">Vista del Estudiante (Espejo)</Text>
-                            <View className="flex-row items-center gap-1.5 px-2 py-1 rounded-full bg-green-100 border border-green-200">
-                                <View className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                <Text className="text-[10px] font-bold text-green-700 uppercase">En vivo</Text>
-                            </View>
-                        </View>
-                        <View className="flex-1 items-center justify-center bg-gray-50 p-4 relative">
-                            {/* Mockup of student screen */}
-                            <View className="w-[200px] h-[350px] bg-white rounded-[20px] border-4 border-gray-800 shadow-xl overflow-hidden items-center justify-center relative">
-                                <View className="absolute top-0 w-full h-6 bg-gray-800 items-center justify-center">
-                                    <View className="w-16 h-3 bg-gray-700 rounded-full" />
-                                </View>
-                                <View className="items-center gap-3 p-4">
-                                    <View className="w-16 h-16 rounded-full bg-primary/20 items-center justify-center mb-2">
-                                        <Feather name="user" size={32} color={palette.primary} />
-                                    </View>
-                                    <Text className="text-center font-bold text-gray-800">¡Esperando al profesor!</Text>
-                                    <Text className="text-center text-xs text-gray-500">El juego comenzará pronto...</Text>
-                                    <View className="mt-4 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                                        <View className="w-1/2 h-full bg-primary animate-pulse" />
-                                    </View>
-                                </View>
-                            </View>
-                            <Text className="text-xs text-muted mt-4 text-center">
-                                Esto es lo que ven tus estudiantes en sus dispositivos
-                            </Text>
-                        </View>
-                    </View>
                 </View>
             </View>
 
@@ -153,9 +123,9 @@ export default function TeacherWaitingRoom({
                     onPress={onStartActivity}
                 >
                     <View className="flex-row items-center gap-2">
-                        <Feather name="play" size={24} color={palette.primaryOn} />
+                        <Feather name={status === 'active' ? "eye" : "play"} size={24} color={palette.primaryOn} />
                         <Text className="text-lg font-bold text-primaryOn">
-                            Iniciar Actividad
+                            {status === 'active' ? "Ver estado" : "Iniciar Actividad"}
                         </Text>
                     </View>
                 </TouchableOpacity>

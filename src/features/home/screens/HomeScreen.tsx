@@ -183,7 +183,13 @@ export default function HomeScreen() {
         setStudentId(`temp-${Date.now()}`);
       }
 
-      navigateTo("student-dashboard");
+      // Check if room is already active
+      if (room.status === 'active') {
+        const gameId = room.games?.[0]?.id || (room as any).game || "image-word";
+        handleStartGame(gameId);
+      } else {
+        navigateTo("student-dashboard");
+      }
     } catch {
       setRoomCodeError("Error de red. Intenta nuevamente más tarde.");
     }
@@ -270,8 +276,6 @@ export default function HomeScreen() {
   );
 
   const isWeb = Platform.OS === "web";
-  // const gameCardBasis = isWeb ? "48%" : "100%"; // Removed in favor of NativeWind
-  // const featureCardBasis = isWeb ? "30%" : "100%"; // Removed in favor of NativeWind
 
   useEffect(() => {
     if (!isWeb || typeof window === "undefined") return;
@@ -712,6 +716,25 @@ export default function HomeScreen() {
           )}
         </View>
 
+        <View className="gap-4 mb-12">
+          <Text
+            className="text-2xl font-bold text-text"
+          >
+            Características
+          </Text>
+          <View className="flex-row flex-wrap gap-4">
+            {FEATURE_ITEMS.map((feature) => (
+              <FeatureCard
+                key={feature.title}
+                title={feature.title}
+                description={feature.description}
+                icon={feature.icon}
+              />
+            ))}
+          </View>
+        </View>
+
+
         <View className="gap-4">
           <Text
             className="text-2xl font-bold text-text"
@@ -725,7 +748,7 @@ export default function HomeScreen() {
               return (
                 <Pressable
                   key={game.id}
-                  className="rounded-2xl p-5 gap-3 border-2 shadow-lg w-full md:w-[48%] lg:w-[30%] active:scale-95 transition-transform active:opacity-90"
+                  className="rounded-2xl p-5 gap-3 border-2 shadow-lg w-full md:w-[calc(50%-0.5rem)] lg:w-[calc(50%-0.5rem)] active:scale-95 transition-transform active:opacity-90"
                   style={{
                     backgroundColor: theme.container,
                     borderColor: theme.accent,
@@ -748,43 +771,13 @@ export default function HomeScreen() {
                       {game.description}
                     </Text>
                   </View>
-                  <View
-                    className="rounded-full px-4 py-2 border-2 self-start mt-2"
-                    style={{
-                      borderColor: theme.accent,
-                      backgroundColor: withAlpha(theme.accent, 0.1),
-                    }}
-                  >
-                    <View className="flex-row items-center gap-2">
-                      <Feather name="play" size={14} color={theme.accent} />
-                      <Text className="text-sm font-semibold" style={{ color: theme.accent }}>
-                        Probar Demo
-                      </Text>
-                    </View>
-                  </View>
+
                 </Pressable>
               );
             })}
           </View>
         </View>
 
-        <View className="gap-4 mb-12">
-          <Text
-            className="text-2xl font-bold text-text"
-          >
-            Características
-          </Text>
-          <View className="flex-row flex-wrap gap-4">
-            {FEATURE_ITEMS.map((feature) => (
-              <FeatureCard
-                key={feature.title}
-                title={feature.title}
-                description={feature.description}
-                icon={feature.icon}
-              />
-            ))}
-          </View>
-        </View>
       </ScrollView>
     </View>
   );
@@ -816,7 +809,7 @@ function TabButton({ label, icon, isActive, onPress }: TabButtonProps) {
         <Feather
           name={icon}
           size={16}
-          color={isActive ? palette.primaryOn : palette.muted}
+          color={isActive ? palette.primary : palette.muted}
         />
         <Text
           className={`text-base font-semibold ${isActive ? "text-primary" : "text-text"}`}
@@ -841,7 +834,7 @@ function FeatureCard({ title, description, icon }: FeatureCardProps) {
     >
       <View
         className="h-10 w-10 rounded-full items-center justify-center"
-        style={{ backgroundColor: withAlpha(palette.primary, 0.12) }}
+        style={{ backgroundColor: palette.surface, borderColor: palette.border, borderWidth: 2 }}
       >
         <Feather name={icon} size={20} color={palette.primary} />
       </View>

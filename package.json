@@ -8,7 +8,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "eslint .",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "test": "node tests/run-tests.js"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md}": [

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Client } from '@stomp/stompjs';
-import { AnswerEventDto } from '@/types/monitoring';
+import { buildAnswerSubmission, sendAnswerWithFallback } from '@/logic/answersDelivery';
 
 interface UseGameMonitoringPublisherProps {
     roomId: string;
@@ -26,50 +26,34 @@ export function useGameMonitoringPublisher({
         elapsedMillis: number
     ) => {
         console.log('useGameMonitoringPublisher - publishAnswer called');
-        if (!stompClient || !stompClient.connected) {
-            console.warn('Cannot publish answer: STOMP client not connected');
+        if (!roomId || !studentId) {
+            console.warn('Cannot publish answer: missing roomId or studentId');
             return;
         }
 
-        const event: AnswerEventDto = {
-            roomId,
+        const submission = buildAnswerSubmission({
             studentId,
+            questionId,
+            answer: selectedOption,
+            questionText,
+            isCorrect,
+            elapsedMs: elapsedMillis,
+            attempt: 1,
             studentName,
             gameId,
-            questionId,
-            questionText,
-            selectedOption,
-            isCorrect,
-            elapsedMillis,
-            answeredAt: new Date().toISOString(),
-        };
+        });
 
-        console.log('Publishing answer event:', event);
+        console.log('Publishing answer submission:', submission);
 
-        try {
-            // Publish to monitoring topic
-            stompClient.publish({
-                destination: `/app/monitoring/room/${roomId}/answer`,
-                body: JSON.stringify(event),
-            });
-
-            // Publish to simple room answers topic (for Teacher Dashboard "Sala en tiempo real")
-            const simpleAnswer = {
-                studentId,
-                studentName,
-                questionId,
-                answer: selectedOption,
-                correct: isCorrect
-            };
-            console.log('Publishing simple answer:', simpleAnswer);
-            stompClient.publish({
-                destination: `/topic/room/${roomId}/answers`,
-                body: JSON.stringify(simpleAnswer),
-            });
-
-        } catch (error) {
-            console.error('Error publishing answer event:', error);
-        }
+        void sendAnswerWithFallback({
+            roomId,
+            submission,
+            stompClient,
+        }).then((result) => {
+            console.log('Answer delivery result:', result);
+        }).catch((error) => {
+            console.error('Error delivering answer event:', error);
+        });
     }, [roomId, studentId, studentName, gameId, stompClient]);
 
     return { publishAnswer };

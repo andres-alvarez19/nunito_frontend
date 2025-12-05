@@ -3,6 +3,8 @@ import { Client } from '@stomp/stompjs';
 import { API_CONFIG } from '@/config/api';
 import * as encoding from 'text-encoding';
 import SockJS from 'sockjs-client';
+import { fetchRoomAnswers } from '@/services/useAnswers';
+import { AnswerViewModel, normalizeAnswerRecord } from '@/logic/answersDelivery';
 
 // Polyfill for TextEncoder/TextDecoder in React Native if not available
 if (typeof (global as any).TextEncoder === 'undefined') {
@@ -32,22 +34,41 @@ interface UseRoomSocketProps {
     userName: string;
     isTeacher?: boolean;
     enabled?: boolean;
+    prefetchAnswers?: boolean;
 }
 
-export interface AnswerDto {
-    studentId: string;
-    studentName: string;
-    questionId: string;
-    answer: string;
-    correct: boolean;
-}
+export type AnswerDto = AnswerViewModel;
 
-export function useRoomSocket({ roomId, userId, userName, isTeacher = false, enabled = true }: UseRoomSocketProps) {
+export function useRoomSocket({ roomId, userId, userName, isTeacher = false, enabled = true, prefetchAnswers }: UseRoomSocketProps) {
     const [users, setUsers] = useState<UserDto[]>([]);
     const [answers, setAnswers] = useState<AnswerDto[]>([]);
     const [status, setStatus] = useState<ConnectionStatus>('DISCONNECTED');
     const [roomStatus, setRoomStatus] = useState<RoomStatus>('WAITING');
     const clientRef = useRef<Client | null>(null);
+    const shouldPrefetchAnswers = prefetchAnswers ?? isTeacher;
+
+    useEffect(() => {
+        setAnswers([]);
+    }, [roomId]);
+
+    useEffect(() => {
+        let cancelled = false;
+        if (!shouldPrefetchAnswers || !roomId) return () => { cancelled = true; };
+
+        fetchRoomAnswers(roomId)
+            .then((fetched) => {
+                if (cancelled) return;
+                const normalized = fetched.map(normalizeAnswerRecord);
+                setAnswers(normalized);
+            })
+            .catch((error) => {
+                console.error('Error fetching room answers:', error);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [roomId, shouldPrefetchAnswers]);
 
     useEffect(() => {
         if (!enabled || !roomId || !userId) return;
@@ -77,13 +98,16 @@ export function useRoomSocket({ roomId, userId, userName, isTeacher = false, ena
                     }
                 });
 
-                // Subscribe to room answers
-                console.log(`Subscribing to /topic/room/${roomId}/answers`);
-                client.subscribe(`/topic/room/${roomId}/answers`, (message) => {
+                // Subscribe to room answers (monitoring stream)
+                console.log(`Subscribing to /topic/monitoring/room/${roomId}/answers`);
+                client.subscribe(`/topic/monitoring/room/${roomId}/answers`, (message) => {
                     console.log('Received answer message:', message.body);
                     try {
-                        const answer: AnswerDto = JSON.parse(message.body);
-                        console.log('Parsed answer:', answer);
+                        const parsed = JSON.parse(message.body);
+                        const answer = normalizeAnswerRecord({
+                            ...parsed,
+                            roomId,
+                        });
                         setAnswers(prev => {
                             const newAnswers = [...prev, answer];
                             console.log('Updated answers state:', newAnswers.length);

@@ -4,11 +4,17 @@ import { RoomSummaryItem } from "@/features/home/types";
 
 export const dashboardController = {
     getStats: async (teacherId: string): Promise<DashboardStats> => {
-        const response = await fetch(`${API_CONFIG.BASE_URL}/teachers/${teacherId}/dashboard/stats`);
+        const response = await fetch(`${API_CONFIG.BASE_URL}/teachers/${teacherId}/metrics`);
         if (!response.ok) {
             throw new Error("Failed to fetch dashboard stats");
         }
-        return response.json();
+        const metrics = await response.json();
+        return {
+            activeRoomsCount: metrics.activeRoomsCount ?? metrics.activeRooms ?? 0,
+            connectedStudentsCount: metrics.connectedStudentsCount ?? metrics.connectedStudents ?? 0,
+            completedActivitiesCount: metrics.completedActivitiesCount ?? metrics.completedActivities ?? 0,
+            averageProgress: Math.round(metrics.averageProgress ?? metrics.averageScore ?? 0),
+        };
     },
 
     getRecentRooms: async (teacherId: string): Promise<RoomSummaryItem[]> => {
