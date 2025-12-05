@@ -24,6 +24,7 @@ export default (): ExpoConfig => ({
     supportsTablet: true,
   },
   android: {
+    package: 'com.andresalvarez.nunito',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#ffffff',
