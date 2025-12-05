@@ -2,14 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
+
 const crypto = require('crypto');
 const app = express();
 const port = 3001;
 
-app.use(cors({
-  origin: true, // Reflect request origin
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // Logging middleware
@@ -50,7 +48,6 @@ app.post('/api/rooms', (req, res) => {
   console.log('New room created:', newRoom);
   res.status(201).json(newRoom);
 });
-
 app.post('/api/rooms/:roomCode/results', (req, res) => {
   console.log(`Submitting results for room ${req.params.roomCode} with data:`, req.body);
   const { roomCode } = req.params;
@@ -146,13 +143,10 @@ wss.on('connection', (ws, req) => {
 
     ws.on('close', () => {
       console.log(`WebSocket connection closed for room: ${roomCode}`);
-      // FIX: Check if roomClients still has the room before accessing it
-      if (roomClients.has(roomCode)) {
-        roomClients.get(roomCode).delete(ws);
-        if (roomClients.get(roomCode).size === 0) {
-          roomClients.delete(roomCode);
-          console.log(`Room ${roomCode} is now empty and has been removed.`);
-        }
+      roomClients.get(roomCode).delete(ws);
+      if (roomClients.get(roomCode).size === 0) {
+        roomClients.delete(roomCode);
+        console.log(`Room ${roomCode} is now empty and has been removed.`);
       }
     });
 
@@ -220,31 +214,6 @@ app.get('/api/rooms/:roomCode', (req, res) => {
 
 app.get('/', (req, res) => {
   res.send('Backend is running!');
-});
-
-app.delete('/api/rooms/:roomId', (req, res) => {
-  const { roomId } = req.params;
-  console.log('Deleting room with ID: ' + roomId);
-
-  try {
-    const roomIndex = rooms.findIndex(r => r.id === roomId);
-    if (roomIndex !== -1) {
-      const room = rooms[roomIndex];
-      if (room.code && roomClients.has(room.code)) {
-        roomClients.delete(room.code);
-      }
-
-      rooms.splice(roomIndex, 1);
-      console.log('Room ' + roomId + ' deleted successfully');
-      res.status(200).json({ message: 'Room deleted' });
-    } else {
-      console.log('Room ' + roomId + ' not found for deletion');
-      res.status(404).json({ message: 'Room not found' });
-    }
-  } catch (error) {
-    console.error('Error deleting room:', error);
-    res.status(500).json({ message: 'Internal server error during deletion' });
-  }
 });
 
 server.listen(port, () => {
