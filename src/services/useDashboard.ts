@@ -64,6 +64,7 @@ export const useDashboard = () => {
 
                     return {
                         ...room,
+                        title: (room as any).name || room.title,
                         students: studentCount,
                         average: room.average ?? 0,
                         completion: room.completion ?? 0,

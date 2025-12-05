@@ -50,19 +50,7 @@ export default function ConnectedUsersList({
                     </ScrollView>
                 </View>
 
-                {/* Mirror View (Mock) */}
-                <View className="flex-1 bg-surface rounded-2xl border border-border p-4 gap-3">
-                    <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-bold text-text">Vista espejo</Text>
-                        <Feather name="monitor" size={16} color={palette.muted} />
-                    </View>
-                    <View className="flex-1 bg-background rounded-xl border border-border/50 items-center justify-center min-h-[150px]">
-                        <Text className="text-xs text-muted text-center">
-                            Vista previa de la pantalla del estudiante
-                        </Text>
-                        <View className="mt-2 w-16 h-10 bg-primary/20 rounded border border-primary/40" />
-                    </View>
-                </View>
+
             </View>
         </View>
     );

@@ -23,7 +23,7 @@ export const useReports = () => {
 
             return response.data.map(room => ({
                 roomId: room.id,
-                roomName: room.title,
+                roomName: (room as any).name || room.title,
                 gameId: room.gameId,
                 difficulty: room.difficulty,
                 studentsCount: room.students,
