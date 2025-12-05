@@ -7,7 +7,8 @@ export type AppState =
   | 'room-dashboard'
   | 'student-dashboard'
   | 'student-game'
-  | 'student-results';
+  | 'student-results'
+  | 'download-app';
 
 export interface Teacher {
   name: string;

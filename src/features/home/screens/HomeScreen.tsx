@@ -552,6 +552,36 @@ export default function HomeScreen() {
     );
   }
 
+  if (appState === "download-app") {
+    const screen = (
+      <View className="flex-1 items-center justify-center bg-background p-8">
+        <Text className="text-3xl font-bold text-text text-center mb-8">
+          Descarga nuestra App
+        </Text>
+        <View className="bg-white p-8 rounded-3xl shadow-lg border border-border mb-8">
+          <Image
+            source={require("../../../../assets/qr.png")}
+            style={{ width: 300, height: 300 }}
+            resizeMode="contain"
+          />
+        </View>
+        <Text className="text-xl text-center text-muted max-w-[500px] mb-8">
+          Escanea el código QR con tu dispositivo Android para descargar e instalar la aplicación Nunito.
+        </Text>
+        <NunitoButton onPress={handleReset}>
+          <Text className="text-lg font-bold text-primaryOn">Volver al inicio</Text>
+        </NunitoButton>
+      </View>
+    );
+    return isWeb ? (
+      <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+        {screen}
+      </WebLayout>
+    ) : (
+      screen
+    );
+  }
+
   const homeContent = (
     <View className="flex-1 bg-background">
       {!isWeb && (
@@ -801,7 +831,7 @@ export default function HomeScreen() {
   );
 
   return isWeb ? (
-    <WebLayout scrollable={false} onLogoPress={handleLogoPress}>
+    <WebLayout scrollable={false} onLogoPress={handleLogoPress} onDownloadPress={() => navigateTo("download-app")}>
       {homeContent}
     </WebLayout>
   ) : (

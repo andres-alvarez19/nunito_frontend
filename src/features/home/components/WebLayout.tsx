@@ -27,6 +27,10 @@ interface WebLayoutProps {
    * Acción al hacer clic en el logo de la barra superior.
    */
   onLogoPress?: () => void;
+  /**
+   * Acción al hacer clic en el botón de descargar app.
+   */
+  onDownloadPress?: () => void;
 }
 
 export default function WebLayout({
@@ -34,6 +38,7 @@ export default function WebLayout({
   scrollable = true,
   fullWidth = false,
   onLogoPress,
+  onDownloadPress,
 }: WebLayoutProps) {
   if (Platform.OS !== "web") {
     return <>{children}</>;
@@ -112,6 +117,14 @@ export default function WebLayout({
               Programa de Integración Escolar
             </Text>
           </View>
+          {onDownloadPress && (
+            <TouchableOpacity
+              onPress={onDownloadPress}
+              className="bg-primaryOn px-4 py-2 rounded-lg ml-auto"
+            >
+              <Text className="text-primary font-bold">Descargar App</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
