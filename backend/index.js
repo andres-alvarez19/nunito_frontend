@@ -133,7 +133,7 @@ const roomClients = new Map();
 wss.on('connection', (ws, req) => {
   const roomCode = new URL(req.url, `http://${req.headers.host}`).searchParams.get('roomCode');
   console.log(`New WebSocket connection for room: ${roomCode}`);
-  
+
   if (roomCode) {
     if (!roomClients.has(roomCode)) {
       roomClients.set(roomCode, new Set());
@@ -221,3 +221,23 @@ server.listen(port, () => {
 });
 
 module.exports = { app, server, wss };
+
+app.delete('/api/rooms/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  console.log('Deleting room with ID: ' + roomId);
+
+  const roomIndex = rooms.findIndex(r => r.id === roomId);
+  if (roomIndex !== -1) {
+    const room = rooms[roomIndex];
+    if (room.code && roomClients.has(room.code)) {
+      roomClients.delete(room.code);
+    }
+
+    rooms.splice(roomIndex, 1);
+    console.log('Room ' + roomId + ' deleted successfully');
+    res.status(200).json({ message: 'Room deleted' });
+  } else {
+    console.log('Room ' + roomId + ' not found for deletion');
+    res.status(404).json({ message: 'Room not found' });
+  }
+});
