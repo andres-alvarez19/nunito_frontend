@@ -106,7 +106,7 @@ export async function sendAnswerWithFallback(options: {
     sentAt: options.submission.sentAt ?? new Date().toISOString(),
   };
   const selectedOptionId = payload.selectedOptionId ?? null;
-  const selectedOptionText = payload.selectedOptionText ?? (selectedOptionId ? null : payload.answer ?? null);
+  const selectedOptionText = payload.selectedOptionText ?? payload.answer ?? null;
   const wsPayload: AnswerEventPayload = {
     roomId: options.roomId,
     studentId: payload.studentId,

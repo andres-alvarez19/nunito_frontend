@@ -7,6 +7,13 @@ export interface GameComponentProps {
   timeLimit: number;
   onGameComplete: (results: GameResults) => void;
   onExit: () => void;
-  onAnswer?: (questionId: string, questionText: string, selectedOption: string, isCorrect: boolean, elapsedMillis: number) => void;
+  onAnswer?: (
+    questionId: string,
+    questionText: string,
+    selectedOptionId: string | null,
+    selectedOptionText: string | null,
+    isCorrect: boolean,
+    elapsedMillis: number
+  ) => void;
   questions?: Question[];
 }

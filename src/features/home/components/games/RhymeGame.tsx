@@ -158,6 +158,7 @@ export default function RhymeGame({ difficulty, timeLimit, onExit, onGameComplet
       onAnswer(
         currentQuestion.id.toString(),
         `Selecciona las palabras que riman con ${currentQuestion.keyWord}`,
+        null,
         selectedAnswers.length > 0 ? selectedAnswers.join(',') : 'NO_ANSWER',
         wasCorrect,
         responseTime * 1000

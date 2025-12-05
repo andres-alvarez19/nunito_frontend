@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Text, View, TouchableOpacity, ScrollView } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { palette } from "@/theme/colors";
@@ -26,12 +26,26 @@ export default function TeacherLiveSession({
     const globalStats = monitoringData?.globalStats;
     const ranking = monitoringData?.ranking || [];
     const students = monitoringData?.students || [];
+    const [expandedStudents, setExpandedStudents] = useState<Record<string, boolean>>({});
+
+    const toggleStudent = (studentName: string) => {
+        setExpandedStudents(prev => ({
+            ...prev,
+            [studentName]: !prev[studentName]
+        }));
+    };
 
     // Calculate live accuracy
     const liveAccuracy = globalStats?.globalAccuracyPct || 0;
 
     // Get current question from the first active student (heuristic)
     const currentQuestionText = students.find(s => s.currentQuestionText)?.currentQuestionText || "Esperando pregunta...";
+
+    // Merge students from monitoring data and connected users to ensure we show everyone
+    const allStudentNames = Array.from(new Set([
+        ...students.map(s => s.studentName),
+        ...connectedUsers
+    ])).sort();
 
     return (
         <TeacherSectionCard
@@ -68,18 +82,20 @@ export default function TeacherLiveSession({
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false}>
-                            {connectedUsers.map((studentName, index) => {
+                            {allStudentNames.map((studentName, index) => {
                                 const studentState = students.find(s => s.studentName === studentName);
-                                const isOnline = studentState?.status === 'online';
-                                const lastAnswer = studentState?.lastSelectedOptionText;
-                                const isCorrect = studentState?.lastIsCorrect;
+                                const isOnline = connectedUsers.includes(studentName);
+                                const isExpanded = expandedStudents[studentName];
+                                const answers = studentState?.answers || [];
 
                                 return (
-                                    <View key={index} className="flex-row items-center gap-3 mb-3 p-3 rounded-xl bg-surfaceMuted border border-border/50">
-                                        <View className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-
-                                        <View className="flex-1">
-                                            <View className="flex-row items-center justify-between mb-1">
+                                    <View key={studentName} className="mb-3 rounded-xl bg-surfaceMuted border border-border/50 overflow-hidden">
+                                        <TouchableOpacity
+                                            className="flex-row items-center gap-3 p-3"
+                                            onPress={() => toggleStudent(studentName)}
+                                        >
+                                            <View className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+                                            <View className="flex-1 flex-row items-center justify-between">
                                                 <Text className="text-base font-bold text-text">{studentName}</Text>
                                                 {studentState && (
                                                     <View className="flex-row items-center gap-2">
@@ -87,27 +103,42 @@ export default function TeacherLiveSession({
                                                         <Text className={`text-sm font-bold ${studentState.accuracyPct >= 60 ? 'text-green-600' : 'text-orange-500'}`}>
                                                             {studentState.accuracyPct}%
                                                         </Text>
+                                                        <Feather name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={palette.muted} />
                                                     </View>
                                                 )}
                                             </View>
+                                        </TouchableOpacity>
 
-                                            {lastAnswer ? (
-                                                <View className="flex-row items-center gap-2">
-                                                    <Text className="text-xs text-muted">Última respuesta:</Text>
-                                                    <View className={`px-2 py-0.5 rounded-md ${isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
-                                                        <Text className={`text-xs font-bold ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
-                                                            {lastAnswer} {isCorrect ? '✓' : '✗'}
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            ) : (
-                                                <Text className="text-xs text-muted italic">Esperando respuesta...</Text>
-                                            )}
-                                        </View>
+                                        {isExpanded && (
+                                            <View className="px-3 pb-3 pt-0">
+                                                <View className="h-[1px] bg-border/50 mb-3" />
+                                                {!Array.isArray(answers) || answers.length === 0 ? (
+                                                    <Text className="text-sm text-muted italic">No hay respuestas aún.</Text>
+                                                ) : (
+                                                    answers.map((ans: any, idx: number) => (
+                                                        <View key={ans.id || `${studentName}-${ans.questionId}-${idx}`} className="mb-2 last:mb-0 p-2 rounded-lg bg-surface border border-border/30">
+                                                            <Text className="text-xs text-muted mb-1">
+                                                                {ans.questionText || `Pregunta ${idx + 1}`}
+                                                            </Text>
+                                                            <View className="flex-row items-center justify-between">
+                                                                <Text className="text-sm font-medium text-text">
+                                                                    {ans.answer || ans.selectedOptionText || ans.selectedOption || "Sin respuesta"}
+                                                                </Text>
+                                                                <View className={`px-2 py-0.5 rounded-md ${ans.isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
+                                                                    <Text className={`text-xs font-bold ${ans.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                                                                        {ans.isCorrect ? 'Correcta' : 'Incorrecta'}
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+                                                        </View>
+                                                    ))
+                                                )}
+                                            </View>
+                                        )}
                                     </View>
                                 );
                             })}
-                            {connectedUsers.length === 0 && (
+                            {allStudentNames.length === 0 && (
                                 <Text className="text-sm text-muted italic text-center py-8">Esperando estudiantes...</Text>
                             )}
                         </ScrollView>

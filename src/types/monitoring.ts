@@ -23,6 +23,7 @@ export interface StudentMonitoringStateDto {
     totalCorrect: number;
     accuracyPct: number;
     avgResponseMillis: number;
+    answers?: AnswerEventDto[];
 }
 
 export interface GlobalMonitoringStatsDto {

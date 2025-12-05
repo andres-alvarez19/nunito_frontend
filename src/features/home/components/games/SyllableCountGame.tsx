@@ -130,7 +130,7 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
     };
   }, []);
 
-  const finalizeQuestion = (wasCorrect: boolean) => {
+  const finalizeQuestion = (wasCorrect: boolean, chosenAnswer: number | null) => {
     const responseTime = Math.max(1, Math.round((Date.now() - questionStartRef.current) / 1000));
     setAnswerWasCorrect(wasCorrect);
     setShowFeedback(true);
@@ -140,7 +140,8 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
       onAnswer(
         currentQuestion.id.toString(),
         `¿Cuántas sílabas tiene ${currentQuestion.word}?`,
-        selectedAnswer !== null ? String(selectedAnswer) : 'NO_ANSWER',
+        null,
+        chosenAnswer !== null ? String(chosenAnswer) : 'NO_ANSWER',
         wasCorrect,
         responseTime * 1000
       );
@@ -178,14 +179,14 @@ export default function SyllableCountGame({ difficulty, timeLimit, onExit, onGam
 
   const handleTimeout = () => {
     if (showFeedback) return;
-    finalizeQuestion(false);
+    finalizeQuestion(false, null);
   };
 
   const handleAnswerPress = (value: number) => {
     if (showFeedback) return;
 
     setSelectedAnswer(value);
-    finalizeQuestion(value === currentQuestion.correctCount);
+    finalizeQuestion(value === currentQuestion.correctCount, value);
   };
 
   const handleNextQuestion = () => {

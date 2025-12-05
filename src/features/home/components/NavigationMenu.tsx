@@ -208,6 +208,18 @@ export default function NavigationMenu({
   // Room creation state
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [expandedStudentsInDetails, setExpandedStudentsInDetails] = useState<Record<string, boolean>>({});
+
+  const toggleStudentDetails = (studentName: string) => {
+    setExpandedStudentsInDetails((prev) => ({
+      ...prev,
+      [studentName]: !prev[studentName],
+    }));
+  };
+
+  useEffect(() => {
+    setExpandedStudentsInDetails({});
+  }, [selectedRoom?.id]);
 
   useEffect(() => {
     if (!copied) return;
@@ -441,6 +453,51 @@ export default function NavigationMenu({
     if (user?.id) fetchRooms(user.id);
   };
 
+  const liveStats = useMemo(() => {
+    const total = liveAnswers.length;
+    const correct = liveAnswers.filter(a => a.isCorrect ?? a.correct).length;
+    const globalAccuracyPct = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+    const byStudent = new Map<string, any>();
+    liveAnswers.forEach(ans => {
+      const entry = byStudent.get(ans.studentId) || {
+        name: ans.studentName || ans.studentId,
+        score: 0,
+        correctAnswers: 0,
+        totalQuestions: 0,
+        averageTime: 0,
+        completedAt: ans.sentAt || ans.createdAt || new Date().toISOString(),
+        answers: [] as any[],
+      };
+      entry.totalQuestions += 1;
+      entry.correctAnswers += (ans.isCorrect ?? ans.correct) ? 1 : 0;
+      entry.averageTime += ans.elapsedMs ? ans.elapsedMs : 0;
+      entry.answers.push({
+        id: ans.id || `${ans.studentId}-${ans.questionId}-${entry.answers.length}`,
+        roomId: ans.roomId,
+        studentId: ans.studentId,
+        gameId: (ans as any).gameId,
+        questionId: ans.questionId?.toString?.() ?? "",
+        questionText: ans.questionText ?? null,
+        answer: ans.selectedOptionText || ans.selectedOptionId || ans.answer || "",
+        isCorrect: ans.isCorrect ?? ans.correct,
+        elapsedMs: ans.elapsedMs,
+        attempt: ans.attempt,
+        createdAt: ans.createdAt,
+        sentAt: (ans as any).sentAt,
+      });
+      byStudent.set(ans.studentId, entry);
+    });
+
+    const liveStudents = Array.from(byStudent.values()).map((s) => ({
+      ...s,
+      averageTime: s.totalQuestions > 0 ? Math.round(s.averageTime / s.totalQuestions / 1000) : 0,
+      score: s.totalQuestions > 0 ? Math.round((s.correctAnswers / s.totalQuestions) * 100) : 0,
+    }));
+
+    return { liveStudents, globalAccuracyPct };
+  }, [liveAnswers]);
+
   const renderRoomDetailView = (backTarget: "rooms" | "reports") => {
     if (!selectedRoom) return null;
     console.log("Detalles de la sala seleccionada:", JSON.stringify(selectedRoom, null, 2));
@@ -454,51 +511,38 @@ export default function NavigationMenu({
       gameDefinitions.find((g) => g.id === selectedRoom.gameId)?.name ??
       selectedRoom.gameLabel;
     const isLiveRoom = socketRoomId === selectedRoom.id && !!liveAnswers;
-    const liveRoomAnswers = isLiveRoom ? liveAnswers : [];
 
-    const liveStats = (() => {
-      const total = liveRoomAnswers.length;
-      const correct = liveRoomAnswers.filter(a => a.isCorrect ?? a.correct).length;
-      const globalAccuracyPct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-      const byStudent = new Map<string, any>();
-      liveRoomAnswers.forEach(ans => {
-        const entry = byStudent.get(ans.studentId) || {
-          name: ans.studentName || ans.studentId,
-          score: 0,
-          correctAnswers: 0,
-          totalQuestions: 0,
-          averageTime: 0,
-          completedAt: ans.answeredAt || ans.sentAt || new Date().toISOString(),
-          answers: [] as any[],
-        };
-        entry.totalQuestions += 1;
-        entry.correctAnswers += (ans.isCorrect ?? ans.correct) ? 1 : 0;
-        entry.averageTime += ans.elapsedMs ? ans.elapsedMs : 0;
-        entry.answers.push({
-          id: ans.id || `${ans.studentId}-${ans.questionId}-${entry.answers.length}`,
-          roomId: ans.roomId || selectedRoom.id,
-          studentId: ans.studentId,
-          gameId: (ans as any).gameId,
-          questionId: ans.questionId?.toString?.() ?? "",
-          questionText: ans.questionText ?? null,
-          answer: ans.selectedOptionText || ans.selectedOptionId || ans.answer || "",
-          isCorrect: ans.isCorrect ?? ans.correct,
-          elapsedMs: ans.elapsedMs,
-          attempt: ans.attempt,
-          createdAt: ans.createdAt,
-          sentAt: (ans as any).sentAt,
-        });
-        byStudent.set(ans.studentId, entry);
+
+    const aggregatedStudents = (() => {
+      if (isLiveRoom) return liveStats.liveStudents;
+
+      // Group students by name to avoid duplicates
+      const results = selectedRoom.studentsResults || [];
+      const groupedMap = new Map<string, any>();
+
+      results.forEach(student => {
+        const existing = groupedMap.get(student.name);
+        if (existing) {
+          // Merge stats
+          existing.totalQuestions += student.totalQuestions;
+          existing.correctAnswers += student.correctAnswers;
+          // Recalculate score and average time (weighted average could be better but simple average for now)
+          existing.score = Math.round((existing.correctAnswers / existing.totalQuestions) * 100);
+          // Merge answers
+          if (student.answers) {
+            existing.answers = [...(existing.answers || []), ...student.answers];
+          }
+          // Keep latest completedAt
+          if (new Date(student.completedAt) > new Date(existing.completedAt)) {
+            existing.completedAt = student.completedAt;
+          }
+        } else {
+          groupedMap.set(student.name, { ...student, answers: student.answers ? [...student.answers] : [] });
+        }
       });
 
-      const liveStudents = Array.from(byStudent.values()).map((s) => ({
-        ...s,
-        averageTime: s.totalQuestions > 0 ? Math.round(s.averageTime / s.totalQuestions / 1000) : 0,
-        score: s.totalQuestions > 0 ? Math.round((s.correctAnswers / s.totalQuestions) * 100) : 0,
-      }));
-
-      return { liveStudents, globalAccuracyPct };
+      return Array.from(groupedMap.values());
     })();
 
     return (
@@ -563,7 +607,7 @@ export default function NavigationMenu({
             <View className="flex-1 min-w-[150px] p-3 rounded-xl border border-border/70 bg-surfaceMuted">
               <Text className="text-xs text-muted mb-1">Estudiantes</Text>
               <Text className="text-lg font-bold text-text">
-                {selectedRoom.students}
+                {aggregatedStudents.length}
               </Text>
             </View>
             <View className="flex-1 min-w-[150px] p-3 rounded-xl border border-border/70 bg-surfaceMuted">
@@ -605,70 +649,88 @@ export default function NavigationMenu({
                 </Text>
               )}
             </View>
-            {(isLiveRoom ? liveStats.liveStudents : (selectedRoom.studentsResults || [])).map((student) => (
-              <View key={student.name} className="border border-border/80 rounded-xl p-3 gap-2.5 bg-surface shadow-sm">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-[15px] font-bold text-text">{student.name}</Text>
-                  <View className="px-2.5 py-1.5 rounded-full bg-primary/12 border border-primary/60">
-                    <Text className="font-bold text-primary">{student.score}%</Text>
-                  </View>
-                </View>
-                <View className="flex-row flex-wrap gap-3">
-                  <View className="flex-1 min-w-[140px] gap-1">
-                    <Text className="text-xs text-muted">Correctas</Text>
-                    <Text className="text-sm font-bold text-text">
-                      {student.correctAnswers}/{student.totalQuestions}
-                    </Text>
-                  </View>
-                  <View className="flex-1 min-w-[140px] gap-1">
-                    <Text className="text-xs text-muted">Tiempo prom.</Text>
-                    <Text className="text-sm font-bold text-text">
-                      {formatSeconds(student.averageTime)}
-                    </Text>
-                  </View>
-                  {!isLiveRoom && (
-                    <View className="flex-1 min-w-[140px] gap-1">
-                      <Text className="text-xs text-muted">Completado</Text>
-                      <Text className="text-sm font-bold text-text">
-                        {formatDate(student.completedAt)}
-                      </Text>
+            {aggregatedStudents.map((student, index) => {
+              const isExpanded = expandedStudentsInDetails[student.name];
+              return (
+                <View key={`${student.name}-${index}`} className="border border-border/80 rounded-xl bg-surface shadow-sm overflow-hidden mb-2">
+                  <TouchableOpacity
+                    className="p-3 gap-2.5"
+                    onPress={() => toggleStudentDetails(student.name)}
+                  >
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-[15px] font-bold text-text">{student.name}</Text>
+                      <View className="flex-row items-center gap-2">
+                        <View className="px-2.5 py-1.5 rounded-full bg-primary/12 border border-primary/60">
+                          <Text className="font-bold text-primary">{student.score}%</Text>
+                        </View>
+                        <Feather name={isExpanded ? "chevron-up" : "chevron-down"} size={20} color={palette.muted} />
+                      </View>
                     </View>
-                  )}
-                  <View className="flex-1 min-w-[140px] gap-1">
-                    <Text className="text-xs text-muted">Progreso</Text>
-                    <View className="h-1.5 rounded-full bg-primary/18 overflow-hidden">
-                      <View
-                        className="h-full bg-primary"
-                        style={{ width: `${student.score}%` }}
-                      />
-                    </View>
-                  </View>
-                </View>
-                {student.answers && student.answers.length > 0 && (
-                  <View className="mt-2 gap-1.5">
-                    <Text className="text-xs text-muted font-semibold">Respuestas</Text>
-                    {student.answers.map((ans) => (
-                      <View key={ans.id || `${ans.questionId}-${ans.sentAt}`} className="p-2 rounded-lg border border-border/60 bg-surfaceMuted">
-                        <Text className="text-xs text-muted">
-                          Pregunta {ans.questionId}{ans.questionText ? `: ${ans.questionText}` : ""}
+                    <View className="flex-row flex-wrap gap-3">
+                      <View className="flex-1 min-w-[140px] gap-1">
+                        <Text className="text-xs text-muted">Correctas</Text>
+                        <Text className="text-sm font-bold text-text">
+                          {student.correctAnswers}/{student.totalQuestions}
                         </Text>
-                        <Text className="text-sm font-semibold text-text">
-                          Respuesta: {ans.answer}
+                      </View>
+                      <View className="flex-1 min-w-[140px] gap-1">
+                        <Text className="text-xs text-muted">Tiempo prom.</Text>
+                        <Text className="text-sm font-bold text-text">
+                          {formatSeconds(student.averageTime)}
                         </Text>
-                        <View className="flex-row justify-between mt-1">
-                          <Text className="text-xs text-muted">
-                            Correcta: {ans.isCorrect ? "Sí" : "No"}
-                          </Text>
-                          <Text className="text-xs text-muted">
-                            Tiempo: {ans.elapsedMs ? `${Math.round(ans.elapsedMs / 1000)}s` : "-"}
+                      </View>
+                      {!isLiveRoom && (
+                        <View className="flex-1 min-w-[140px] gap-1">
+                          <Text className="text-xs text-muted">Completado</Text>
+                          <Text className="text-sm font-bold text-text">
+                            {formatDate(student.completedAt)}
                           </Text>
                         </View>
+                      )}
+                      <View className="flex-1 min-w-[140px] gap-1">
+                        <Text className="text-xs text-muted">Progreso</Text>
+                        <View className="h-1.5 rounded-full bg-primary/18 overflow-hidden">
+                          <View
+                            className="h-full bg-primary"
+                            style={{ width: `${student.score}%` }}
+                          />
+                        </View>
                       </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            ))}
+                    </View>
+                  </TouchableOpacity>
+
+                  {isExpanded && (
+                    <View className="px-3 pb-3 border-t border-border/50 pt-3 bg-surfaceMuted/20">
+                      {Array.isArray(student.answers) && student.answers.length > 0 ? (
+                        <View className="gap-1.5">
+                          <Text className="text-xs text-muted font-semibold">Respuestas</Text>
+                          {student.answers.map((ans: any, idx: number) => (
+                            <View key={ans.id || `${ans.questionId}-${ans.sentAt}-${idx}`} className="p-2 rounded-lg border border-border/60 bg-surfaceMuted">
+                              <Text className="text-xs text-muted">
+                                Pregunta {ans.questionId}{ans.questionText ? `: ${ans.questionText}` : ""}
+                              </Text>
+                              <Text className="text-sm font-semibold text-text">
+                                Respuesta: {ans.answer}
+                              </Text>
+                              <View className="flex-row justify-between mt-1">
+                                <Text className="text-xs text-muted">
+                                  Correcta: {ans.isCorrect ? "Sí" : "No"}
+                                </Text>
+                                <Text className="text-xs text-muted">
+                                  Tiempo: {ans.elapsedMs ? `${Math.round(ans.elapsedMs / 1000)}s` : "-"}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      ) : (
+                        <Text className="text-sm text-muted italic">No hay respuestas registradas.</Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
 
           {(selectedRoom.status === "active" || selectedRoom.status === "pending") && (
@@ -730,12 +792,12 @@ export default function NavigationMenu({
             monitoringData={{
               roomId: room.id,
               timestamp: new Date().toISOString(),
-              students: liveMonitoring?.students || monitoredStudents,
-              globalStats: liveMonitoring?.globalStats || globalStats || {
-                activeStudentsCount: 0,
+              students: liveStats.liveStudents as any[],
+              globalStats: {
+                activeStudentsCount: connectedUserNames.length,
                 totalAnsweredAll: 0,
                 totalCorrectAll: 0,
-                globalAccuracyPct: 0,
+                globalAccuracyPct: liveStats.globalAccuracyPct,
               },
               ranking: ranking
             }}

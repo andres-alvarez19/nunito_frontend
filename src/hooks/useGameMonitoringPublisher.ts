@@ -21,7 +21,8 @@ export function useGameMonitoringPublisher({
     const publishAnswer = useCallback((
         questionId: string,
         questionText: string,
-        selectedOption: string,
+        selectedOptionId: string | null,
+        selectedOptionText: string | null,
         isCorrect: boolean,
         elapsedMillis: number
     ) => {
@@ -34,13 +35,15 @@ export function useGameMonitoringPublisher({
         const submission = buildAnswerSubmission({
             studentId,
             questionId,
-            answer: selectedOption,
+            answer: selectedOptionText ?? selectedOptionId ?? '',
             questionText,
             isCorrect,
             elapsedMs: elapsedMillis,
             attempt: 1,
             studentName,
             gameId,
+            selectedOptionId,
+            selectedOptionText,
         });
 
         console.log('Publishing answer submission:', submission);

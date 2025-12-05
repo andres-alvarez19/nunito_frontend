@@ -177,7 +177,7 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
     };
   }, []);
 
-  const finalizeQuestion = (wasCorrect: boolean) => {
+  const finalizeQuestion = (wasCorrect: boolean, chosenAnswer: string | null) => {
     const responseTime = Math.max(1, Math.round((Date.now() - questionStartRef.current) / 1000));
     setAnswerWasCorrect(wasCorrect);
     setShowFeedback(true);
@@ -187,7 +187,8 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
       onAnswer(
         currentQuestion.id.toString(),
         `Escucha y selecciona la palabra: ${currentQuestion.audioWord}`,
-        selectedAnswer ?? 'NO_ANSWER',
+        null,
+        chosenAnswer ?? 'NO_ANSWER',
         wasCorrect,
         responseTime * 1000
       );
@@ -225,14 +226,14 @@ export default function AudioRecognitionGame({ difficulty, timeLimit, onExit, on
 
   const handleTimeout = () => {
     if (showFeedback) return;
-    finalizeQuestion(false);
+    finalizeQuestion(false, null);
   };
 
   const handleAnswerPress = (answer: string) => {
     if (showFeedback) return;
 
     setSelectedAnswer(answer);
-    finalizeQuestion(answer === currentQuestion.correctAnswer);
+    finalizeQuestion(answer === currentQuestion.correctAnswer, answer);
   };
 
   const handleNextQuestion = () => {

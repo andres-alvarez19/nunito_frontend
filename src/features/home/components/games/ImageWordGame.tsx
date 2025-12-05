@@ -218,7 +218,8 @@ export default function ImageWordGame({ difficulty, timeLimit, onExit, onGameCom
       onAnswer(
         currentQuestion.id.toString(),
         '¿Qué ves en la imagen?', // Or a more specific text if available
-        selectedAnswer || 'TIMEOUT',
+        null,
+        selectedAnswer || currentQuestion.correctAnswer || 'TIMEOUT',
         wasCorrect,
         responseTime * 1000
       );
