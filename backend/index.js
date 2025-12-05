@@ -2,29 +2,23 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
-
 const crypto = require('crypto');
 const app = express();
 const port = 3001;
-
 app.use(cors());
 app.use(express.json());
-
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
-
 // In-memory data stores
 const teachers = [];
 const rooms = [];
 const gameResults = [];
-
 function generateRoomCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
-
 app.post('/api/rooms', (req, res) => {
   console.log('Creating a new room with data:', req.body);
   const { name, game, difficulty, duration, teacherId } = req.body;
@@ -32,7 +26,6 @@ app.post('/api/rooms', (req, res) => {
   if (!teacher) {
     return res.status(400).json({ message: 'Teacher not found' });
   }
-
   const newRoom = {
     id: new Date().toISOString(),
     code: generateRoomCode(),
@@ -52,7 +45,6 @@ app.post('/api/rooms/:roomCode/results', (req, res) => {
   console.log(`Submitting results for room ${req.params.roomCode} with data:`, req.body);
   const { roomCode } = req.params;
   const { studentName, results } = req.body;
-
   const room = rooms.find(r => r.code === roomCode);
   if (room) {
     const result = {
@@ -70,7 +62,6 @@ app.post('/api/rooms/:roomCode/results', (req, res) => {
     res.status(404).json({ message: 'Room not found' });
   }
 });
-
 app.get('/api/rooms/:roomCode/results', (req, res) => {
   console.log(`Getting results for room ${req.params.roomCode}`);
   const { roomCode } = req.params;
@@ -78,7 +69,6 @@ app.get('/api/rooms/:roomCode/results', (req, res) => {
   console.log(`Found ${results.length} results for room ${roomCode}`);
   res.json(results);
 });
-
 app.get('/api/rooms/all/results', (req, res) => {
   console.log('Getting all results');
   const { teacherId } = req.query;
@@ -90,14 +80,12 @@ app.get('/api/rooms/all/results', (req, res) => {
   }
   res.json(gameResults);
 });
-
 app.get('/api/teachers/:teacherId/rooms', (req, res) => {
   const { teacherId } = req.params;
   const teacherRooms = rooms.filter(r => r.teacherId === teacherId);
   console.log(`Found ${teacherRooms.length} rooms for teacher ${teacherId}`);
   res.json(teacherRooms);
 });
-
 app.post('/api/teachers/register', (req, res) => {
   console.log('Registering a new teacher with data:', req.body);
   const { name, email, password } = req.body;
@@ -110,7 +98,6 @@ app.post('/api/teachers/register', (req, res) => {
   console.log('New teacher registered:', newTeacher);
   res.status(201).json(newTeacher);
 });
-
 app.post('/api/teachers/login', (req, res) => {
   console.log('Logging in a teacher with data:', req.body);
   const { email, password } = req.body;
@@ -123,33 +110,30 @@ app.post('/api/teachers/login', (req, res) => {
     res.status(401).json({ message: 'Invalid credentials' });
   }
 });
-
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-
 // Store clients per room
 const roomClients = new Map();
-
 wss.on('connection', (ws, req) => {
   const roomCode = new URL(req.url, `http://${req.headers.host}`).searchParams.get('roomCode');
   console.log(`New WebSocket connection for room: ${roomCode}`);
-
   if (roomCode) {
     if (!roomClients.has(roomCode)) {
       roomClients.set(roomCode, new Set());
     }
     roomClients.get(roomCode).add(ws);
     console.log(`Client added to room ${roomCode}. Total clients in room: ${roomClients.get(roomCode).size}`);
-
     ws.on('close', () => {
       console.log(`WebSocket connection closed for room: ${roomCode}`);
-      roomClients.get(roomCode).delete(ws);
-      if (roomClients.get(roomCode).size === 0) {
-        roomClients.delete(roomCode);
-        console.log(`Room ${roomCode} is now empty and has been removed.`);
+      // FIX: Check if roomClients still has the room before accessing it
+      if (roomClients.has(roomCode)) {
+        roomClients.get(roomCode).delete(ws);
+        if (roomClients.get(roomCode).size === 0) {
+          roomClients.delete(roomCode);
+          console.log(`Room ${roomCode} is now empty and has been removed.`);
+        }
       }
     });
-
     ws.on('message', (message) => {
       console.log(`Received message from room ${roomCode}: ${message}`);
       const parsedMessage = JSON.parse(message);
@@ -165,7 +149,6 @@ wss.on('connection', (ws, req) => {
     });
   }
 });
-
 function broadcastToRoom(roomCode, message) {
   console.log(`Broadcasting message to room ${roomCode}:`, message);
   if (roomClients.has(roomCode)) {
@@ -176,14 +159,11 @@ function broadcastToRoom(roomCode, message) {
     }
   }
 }
-
 app.post('/api/rooms/:roomCode/join', (req, res) => {
   console.log(`Student joining room ${req.params.roomCode} with data:`, req.body);
   const { roomCode } = req.params;
   const { studentName } = req.body;
-
   const room = rooms.find(r => r.code === roomCode);
-
   if (room) {
     if (!room.students.includes(studentName)) {
       room.students.push(studentName);
@@ -196,12 +176,10 @@ app.post('/api/rooms/:roomCode/join', (req, res) => {
     res.status(404).json({ message: 'Room not found' });
   }
 });
-
 app.get('/api/rooms/:roomCode', (req, res) => {
   console.log(`Getting details for room ${req.params.roomCode}`);
   const { roomCode } = req.params;
   const room = rooms.find(r => r.code === roomCode);
-
   if (room) {
     console.log(`Found room:`, room);
     res.json(room);
@@ -210,29 +188,18 @@ app.get('/api/rooms/:roomCode', (req, res) => {
     res.status(404).json({ message: 'Room not found' });
   }
 });
-
-
 app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
-
-server.listen(port, () => {
-  console.log(`Backend listening at http://localhost:${port}`);
-});
-
-module.exports = { app, server, wss };
-
 app.delete('/api/rooms/:roomId', (req, res) => {
   const { roomId } = req.params;
   console.log('Deleting room with ID: ' + roomId);
-
   const roomIndex = rooms.findIndex(r => r.id === roomId);
   if (roomIndex !== -1) {
     const room = rooms[roomIndex];
     if (room.code && roomClients.has(room.code)) {
       roomClients.delete(room.code);
     }
-
     rooms.splice(roomIndex, 1);
     console.log('Room ' + roomId + ' deleted successfully');
     res.status(200).json({ message: 'Room deleted' });
@@ -241,3 +208,7 @@ app.delete('/api/rooms/:roomId', (req, res) => {
     res.status(404).json({ message: 'Room not found' });
   }
 });
+server.listen(port, () => {
+  console.log(`Backend listening at http://localhost:${port}`);
+});
+module.exports = { app, server, wss };
