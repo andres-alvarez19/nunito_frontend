@@ -94,33 +94,8 @@ app.get('/api/rooms/all/results', (req, res) => {
 app.get('/api/teachers/:teacherId/rooms', (req, res) => {
   const { teacherId } = req.params;
   const teacherRooms = rooms.filter(r => r.teacherId === teacherId);
-
-  const enrichedRooms = teacherRooms.map(room => {
-    const roomResults = gameResults.filter(r => r.roomCode === room.code);
-
-    const totalScore = roomResults.reduce((sum, r) => sum + r.results.score, 0);
-    const averageScore = roomResults.length > 0 ? Math.round(totalScore / roomResults.length) : 0;
-
-    const studentsResults = roomResults.map(r => ({
-      name: r.studentName,
-      score: r.results.score,
-      correctAnswers: r.results.correctAnswers,
-      totalQuestions: r.results.totalQuestions,
-      averageTime: r.results.averageTime,
-      completedAt: r.timestamp
-    }));
-
-    return {
-      ...room,
-      average: averageScore,
-      completion: roomResults.length > 0 ? 100 : 0,
-      studentsResults: studentsResults,
-      students: room.students.length // Send count as well, though frontend handles array
-    };
-  });
-
-  console.log(`Found ${enrichedRooms.length} rooms for teacher ${teacherId}`);
-  res.json(enrichedRooms);
+  console.log(`Found ${teacherRooms.length} rooms for teacher ${teacherId}`);
+  res.json(teacherRooms);
 });
 
 app.post('/api/teachers/register', (req, res) => {
@@ -246,23 +221,3 @@ server.listen(port, () => {
 });
 
 module.exports = { app, server, wss };
-
-app.delete('/api/rooms/:roomId', (req, res) => {
-  const { roomId } = req.params;
-  console.log('Deleting room with ID: ' + roomId);
-
-  const roomIndex = rooms.findIndex(r => r.id === roomId);
-  if (roomIndex !== -1) {
-    const room = rooms[roomIndex];
-    if (room.code && roomClients.has(room.code)) {
-      roomClients.delete(room.code);
-    }
-
-    rooms.splice(roomIndex, 1);
-    console.log('Room ' + roomId + ' deleted successfully');
-    res.status(200).json({ message: 'Room deleted' });
-  } else {
-    console.log('Room ' + roomId + ' not found for deletion');
-    res.status(404).json({ message: 'Room not found' });
-  }
-});
