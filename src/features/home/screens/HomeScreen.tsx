@@ -778,6 +778,24 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {isWeb && (
+          <View className="gap-4 mt-8 mb-8 items-center">
+            <Text className="text-2xl font-bold text-text text-center">
+              Descarga nuestra App
+            </Text>
+            <View className="bg-white p-4 rounded-xl shadow-md border border-border">
+              <Image
+                source={require("../../../../assets/qr.png")}
+                style={{ width: 200, height: 200 }}
+                resizeMode="contain"
+              />
+            </View>
+            <Text className="text-base text-center text-muted max-w-[300px]">
+              Escanea el código QR para descargar la versión de Android
+            </Text>
+          </View>
+        )}
+
       </ScrollView>
     </View>
   );

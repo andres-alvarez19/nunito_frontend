@@ -26,7 +26,7 @@ export default (): ExpoConfig => ({
   android: {
     package: 'com.andresalvarez.nunito',
     adaptiveIcon: {
-      foregroundImage: './assets/adaptive-icon.png',
+      foregroundImage: './assets/favicon.png',
       backgroundColor: '#ffffff',
     },
     edgeToEdgeEnabled: true,
